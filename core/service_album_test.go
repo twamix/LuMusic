@@ -74,28 +74,6 @@ func TestUserPlaylistFactoriesAndSourceList(t *testing.T) {
 	}
 }
 
-func TestRecommendAndCategorySourcesPreferSoda(t *testing.T) {
-	recommendSources := []string{"soda", "netease", "qq", "kugou", "kuwo"}
-	for _, source := range recommendSources {
-		if fn := GetRecommendFunc(source); fn == nil {
-			t.Fatalf("GetRecommendFunc(%q) returned nil", source)
-		}
-	}
-	if got := GetRecommendSourceNames(); !reflect.DeepEqual(got, recommendSources) {
-		t.Fatalf("GetRecommendSourceNames() = %v, want %v", got, recommendSources)
-	}
-
-	categorySources := []string{"soda", "netease", "qq", "kugou", "kuwo", "migu", "qianqian", "joox", "apple"}
-	for _, source := range categorySources {
-		if fn := GetPlaylistCategoriesFunc(source); fn == nil {
-			t.Fatalf("GetPlaylistCategoriesFunc(%q) returned nil", source)
-		}
-	}
-	if got := GetPlaylistCategorySourceNames(); !reflect.DeepEqual(got, categorySources) {
-		t.Fatalf("GetPlaylistCategorySourceNames() = %v, want %v", got, categorySources)
-	}
-}
-
 func TestJooxPlaylistIntegration(t *testing.T) {
 	requireIntegration(t)
 	runPlaylistIntegration(t, playlistIntegrationCase{

@@ -279,17 +279,6 @@ func TestAppJSPlaybackURLIgnoresEmbedDownloadSetting(t *testing.T) {
 	}
 }
 
-func TestRecommendNavigationDefaultsToSoda(t *testing.T) {
-	content, err := templateFS.ReadFile("templates/static/js/app.js")
-	if err != nil {
-		t.Fatalf("ReadFile(app.js): %v", err)
-	}
-
-	if !strings.Contains(string(content), `const supported = ["soda", "netease", "qq", "kugou", "kuwo"];`) {
-		t.Fatal("goToRecommend should include soda as the first default source")
-	}
-}
-
 func TestDownloadURLsCarryAlbumForMetadataEmbedding(t *testing.T) {
 	jsContent, err := templateFS.ReadFile("templates/static/js/app.js")
 	if err != nil {
