@@ -1556,7 +1556,7 @@ function toggleSearchType(type) {
 }
 
 function goToRecommend() {
-  const supported = ["netease", "qq", "kugou", "kuwo"];
+  const supported = ["soda", "netease", "qq", "kugou", "kuwo"];
   const selected = [];
   document.querySelectorAll(".source-checkbox:checked").forEach((cb) => {
     if (supported.includes(cb.value)) {

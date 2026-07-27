@@ -308,6 +308,8 @@ func GetRecommendFunc(source string) func() ([]model.Playlist, error) {
 		return kugou.New(c).GetRecommendedPlaylists
 	case "kuwo":
 		return kuwo.New(c).GetRecommendedPlaylists
+	case "soda":
+		return soda.New(c).GetRecommendedPlaylists
 	default:
 		return nil
 	}
@@ -424,7 +426,7 @@ func GetUserPlaylistSourceNames() []string {
 }
 
 func GetRecommendSourceNames() []string {
-	return []string{"netease", "qq", "kugou", "kuwo"}
+	return []string{"soda", "netease", "qq", "kugou", "kuwo"}
 }
 
 func GetDownloadFunc(source string) func(*model.Song) (string, error) {
@@ -1015,7 +1017,7 @@ func GetAlbumSourceNames() []string {
 }
 
 func GetPlaylistCategorySourceNames() []string {
-	return []string{"netease", "qq", "kugou", "kuwo", "migu", "qianqian", "joox", "apple"}
+	return []string{"soda", "netease", "qq", "kugou", "kuwo", "migu", "qianqian", "joox", "apple"}
 }
 
 func GetDefaultSourceNames() []string {
