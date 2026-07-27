@@ -339,3 +339,25 @@ func TestConfigAuthOnlyProtectsConfigRoutes(t *testing.T) {
 		t.Fatalf("config HEAD status = %d, want %d", headRec.Code, http.StatusUnauthorized)
 	}
 }
+
+func TestRootIndexIsPublic(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	api := router.Group(RoutePrefix)
+	bindAuthMiddleware(api, StartOptions{})
+	api.GET("", func(c *gin.Context) {
+		c.String(http.StatusOK, "public-home")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, RoutePrefix, nil)
+	req.Header.Set("Accept", "text/html")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if rec.Body.String() != "public-home" {
+		t.Fatalf("body = %q, want public-home", rec.Body.String())
+	}
+}

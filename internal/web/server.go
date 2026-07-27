@@ -430,10 +430,7 @@ func StartWithOptions(port string, opts StartOptions) {
 }
 
 func rootIndexHandlers(opts StartOptions) []gin.HandlerFunc {
-	handlers := make([]gin.HandlerFunc, 0, 2)
-	if !opts.DisableAuth {
-		handlers = append(handlers, authRequired(core.GetWebAuthSettings))
-	}
+	handlers := make([]gin.HandlerFunc, 0, 1)
 	handlers = append(handlers, func(c *gin.Context) {
 		renderIndex(c, nil, nil, "", nil, "", "song", "", "", "", false, "", nil)
 	})
