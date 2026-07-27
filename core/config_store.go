@@ -281,19 +281,19 @@ func SaveWebSettings(settings WebSettings) error {
 func GetWebAuthSettings() (WebAuthSettings, error) {
 	settings := defaultWebAuthSettings()
 	if err := ensureConfigDB(); err != nil {
-		return settings, err
+		return settings, nil
 	}
 
 	var row configKV
 	if err := configDB.Where("key = ?", webAuthSettingsKey).Limit(1).Find(&row).Error; err != nil {
-		return settings, err
+		return settings, nil
 	}
 	if row.Key == "" {
 		return settings, nil
 	}
 
 	if err := json.Unmarshal([]byte(row.Value), &settings); err != nil {
-		return defaultWebAuthSettings(), err
+		return defaultWebAuthSettings(), nil
 	}
 	return normalizeWebAuthSettings(settings), nil
 }
