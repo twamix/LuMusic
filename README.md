@@ -207,7 +207,7 @@ ffmpeg -version
 
 本项目提供了多种 Docker 部署方式。当前默认通过 `./data` 目录挂载到容器内 `/home/appuser/data`，下载文件、配置与收藏数据都会持久化到该目录。
 
-*注意：首次运行前必须先创建 `data` 目录（如 `mkdir -p data && chmod 777 data`），便于宿主机直接访问下载与配置数据。*
+*注意：首次运行前请确保宿主机 `data` 目录存在且当前用户可写，便于容器持久化下载与配置数据。*
 
 #### 1. 生产环境部署（推荐）
 
@@ -239,7 +239,7 @@ docker compose down
 * 支持后台运行和自动重启
 * 默认使用 `./data` 本地目录做数据持久化，便于直接查看和备份
 * 设置时区为亚洲上海
-* 以非root用户(uid=1000)运行，提高安全性
+* 默认直接使用容器内置账号启动；如宿主机挂载目录存在权限问题，可在 compose 中显式调整 `user` 配置
 
 #### 2. 开发环境部署（本地构建）
 
@@ -260,13 +260,12 @@ docker run -d --name music-dl \
   -p 8080:8080 \
   -v $(pwd)/data:/home/appuser/data \
   -e TZ=Asia/Shanghai \
-  --user 1000:1000 \
   --restart unless-stopped \
   ghcr.io/twamix/lumusic:latest \
   ./music-dl web --port 8080 --no-browser
 
 # Windows PowerShell
-docker run -d --name music-dl -p 8080:8080 -v ${PWD}/data:/home/appuser/data -e TZ=Asia/Shanghai --user 1000:1000 --restart unless-stopped ghcr.io/twamix/lumusic:latest ./music-dl web --port 8080 --no-browser
+docker run -d --name music-dl -p 8080:8080 -v ${PWD}/data:/home/appuser/data -e TZ=Asia/Shanghai --restart unless-stopped ghcr.io/twamix/lumusic:latest ./music-dl web --port 8080 --no-browser
 
 ```
 
