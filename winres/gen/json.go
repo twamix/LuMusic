@@ -54,7 +54,7 @@ const resourceTemplate = `{
           "0409": {
             "Comments": "A complete, engineered Go music download project with CLI and Web interface",
             "CompanyName": "guohuiyuan",
-            "FileDescription": "https://github.com/guohuiyuan/go-music-dl",
+            "FileDescription": "https://github.com/twamix/LuMusic",
             "FileVersion": "%s",
             "InternalName": "%s",
             "LegalCopyright": "%s",

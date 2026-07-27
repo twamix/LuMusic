@@ -1,4 +1,4 @@
-module github.com/guohuiyuan/go-music-dl
+module github.com/twamix/LuMusic
 
 go 1.25.1
 

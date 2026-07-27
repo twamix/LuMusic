@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/guohuiyuan/go-music-dl/internal/web"
+	"github.com/twamix/LuMusic/internal/web"
 )
 
 const (

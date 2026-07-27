@@ -14,11 +14,11 @@ Go Music DL 是一个音乐搜索与下载工具，支持 **Web 界面**、**TUI
 
 最简单的使用方式，下载即用：
 
-1. 从 [Releases](https://github.com/guohuiyuan/go-music-dl/releases) 下载 `music-dl-desktop-rust.exe` 或 `music-dl-desktop-go.exe`
+1. 从 [Releases](https://github.com/twamix/LuMusic/releases) 下载 `music-dl-desktop-rust.exe` 或 `music-dl-desktop-go.exe`
 2. 解压，双击运行
 3. 享受原生桌面体验！
 
-移动端下载说明：在 [Releases](https://github.com/guohuiyuan/go-music-dl/releases) 页面可直接下载 Android `music-dl_arm64-v8a.apk`（推荐）/ `music-dl_x86_64.apk` / `music-dl.apk`（无分片兼容包）。Android APK 已内置 `ffmpeg` 与 `ffprobe`，本地音乐探测、非 MP3 元数据内嵌和视频渲染无需在手机上额外安装 FFmpeg。iOS 会提供 `music-dl-ios-unsigned.ipa` 给用户自行签名；如果发布环境配置了证书，也会额外提供已签名的 `music-dl-ios.ipa`。
+移动端下载说明：在 [Releases](https://github.com/twamix/LuMusic/releases) 页面可直接下载 Android `music-dl_arm64-v8a.apk`（推荐）/ `music-dl_x86_64.apk` / `music-dl.apk`（无分片兼容包）。Android APK 已内置 `ffmpeg` 与 `ffprobe`，本地音乐探测、非 MP3 元数据内嵌和视频渲染无需在手机上额外安装 FFmpeg。iOS 会提供 `music-dl-ios-unsigned.ipa` 给用户自行签名；如果发布环境配置了证书，也会额外提供已签名的 `music-dl-ios.ipa`。
 
 ### Web 模式
 
@@ -235,7 +235,7 @@ docker compose down
 
 **说明：**
 
-* 自动拉取 `guohuiyuan/go-music-dl:latest` 镜像
+* 自动拉取 `ghcr.io/twamix/lumusic:latest` 镜像
 * 支持后台运行和自动重启
 * 默认使用 `./data` 本地目录做数据持久化，便于直接查看和备份
 * 设置时区为亚洲上海
@@ -262,11 +262,11 @@ docker run -d --name music-dl \
   -e TZ=Asia/Shanghai \
   --user 1000:1000 \
   --restart unless-stopped \
-  guohuiyuan/go-music-dl:latest \
+  ghcr.io/twamix/lumusic:latest \
   ./music-dl web --port 8080 --no-browser
 
 # Windows PowerShell
-docker run -d --name music-dl -p 8080:8080 -v ${PWD}/data:/home/appuser/data -e TZ=Asia/Shanghai --user 1000:1000 --restart unless-stopped guohuiyuan/go-music-dl:latest ./music-dl web --port 8080 --no-browser
+docker run -d --name music-dl -p 8080:8080 -v ${PWD}/data:/home/appuser/data -e TZ=Asia/Shanghai --user 1000:1000 --restart unless-stopped ghcr.io/twamix/lumusic:latest ./music-dl web --port 8080 --no-browser
 
 ```
 
@@ -365,7 +365,7 @@ adb install -r music-dl.apk
 * 校验三个 APK 都包含对应 ABI 的 `ffmpeg/ffprobe`，不包含旧的 `libffmpeg.so/libffprobe.so` 条目，且签名有效
 * 上传 `music-dl_arm64-v8a.apk`、`music-dl_x86_64.apk`、`music-dl.apk` 到 Actions Artifacts 和 GitHub Release
 
-发布后可在 [Releases](https://github.com/guohuiyuan/go-music-dl/releases) 下载三个 APK，推荐优先使用 `music-dl_arm64-v8a.apk`；极个别设备若无法安装/运行，再下载 `music-dl.apk`（无分片兼容包）。
+发布后可在 [Releases](https://github.com/twamix/LuMusic/releases) 下载三个 APK，推荐优先使用 `music-dl_arm64-v8a.apk`；极个别设备若无法安装/运行，再下载 `music-dl.apk`（无分片兼容包）。
 
 #### 3. Java 17 与 Build-Tools 版本说明（重点）
 
@@ -422,7 +422,7 @@ IOS_UNSIGNED_ONLY=1 ./package_ios.sh
 * `music-dl-ios.ipa`：已签名真机安装包，需要 `IOS_PROVISION_PROFILE` 指向匹配 `IOS_APP_ID` 的 `.mobileprovision`
 * `music-dl-ios-unsigned.ipa`：真机架构待签名包，仅用于用户自行重签，不能直接安装
 
-发布后可在 [Releases](https://github.com/guohuiyuan/go-music-dl/releases) 下载 `music-dl-ios-unsigned.ipa`；配置签名 secrets 后也会上传 `music-dl-ios.ipa`。
+发布后可在 [Releases](https://github.com/twamix/LuMusic/releases) 下载 `music-dl-ios-unsigned.ipa`；配置签名 secrets 后也会上传 `music-dl-ios.ipa`。
 
 > 注意：`music-dl-ios-unsigned.ipa` 不是可直接安装包，需要用户用自己的证书和 provisioning profile 重签。如果需要 GitHub Actions 自动发布已签名 iOS 包，需要配置 `IOS_PROVISION_PROFILE_BASE64`、`IOS_CERTIFICATE_P12_BASE64` 和 `IOS_CERTIFICATE_PASSWORD`。
 
@@ -652,4 +652,4 @@ go-music-dl/
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/image?repos=guohuiyuan/go-music-dl&type=date&legend=top-left)](https://www.star-history.com/?repos=guohuiyuan%2Fgo-music-dl&type=date&legend=top-left)
+[![Star History Chart](https://api.star-history.com/image?repos=twamix/LuMusic&type=date&legend=top-left)](https://www.star-history.com/?repos=twamix%2FLuMusic&type=date&legend=top-left)

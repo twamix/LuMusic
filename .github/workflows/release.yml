@@ -235,7 +235,7 @@ jobs:
           priority: optional
           maintainer: guohuiyuan
           description: Go desktop build of go-music-dl
-          homepage: https://github.com/guohuiyuan/go-music-dl
+          homepage: https://github.com/twamix/LuMusic
           license: AGPL-3.0
           contents:
             - src: ./dist/${{ matrix.binary_name }}

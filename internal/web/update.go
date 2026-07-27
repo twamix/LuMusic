@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/guohuiyuan/go-music-dl/core"
+	"github.com/twamix/LuMusic/core"
 )
 
 const githubRequestTimeout = 5 * time.Second
@@ -84,7 +84,7 @@ func RegisterUpdateRoutes(api *gin.RouterGroup) {
 		if proxyURL == "" {
 			proxyURL = core.DefaultGithubProxyURL
 		}
-		target := proxiedGitHubURL("https://github.com/guohuiyuan/go-music-dl", proxyURL, true)
+		target := proxiedGitHubURL("https://github.com/twamix/LuMusic", proxyURL, true)
 		startedAt := time.Now()
 		req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, target, nil)
 		if err != nil {

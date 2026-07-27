@@ -80,7 +80,7 @@ build_unsigned_package() {
     -version "$VERSION" \
     -minsdk "$IOS_MIN_SDK" \
     -icon ../winres/icon_256x256.png \
-    github.com/guohuiyuan/go-music-dl/desktop_app 2>"$gogio_log"
+    github.com/twamix/LuMusic/desktop_app 2>"$gogio_log"
   local gogio_status=$?
   set -e
   popd >/dev/null
@@ -138,7 +138,7 @@ EOF
     -minsdk "$IOS_MIN_SDK" \
     -icon ../winres/icon_256x256.png \
     -signkey "$IOS_PROVISION_PROFILE" \
-    github.com/guohuiyuan/go-music-dl/desktop_app
+    github.com/twamix/LuMusic/desktop_app
   popd >/dev/null
 
   if [[ ! -f "$output_abs" ]]; then

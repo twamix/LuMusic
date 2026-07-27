@@ -18,7 +18,7 @@ const DOWNLOAD_DIR_PRESET_VALUES = [
   "/sdcard/Download",
 ];
 const DOWNLOAD_DIR_PRESETS = new Set(DOWNLOAD_DIR_PRESET_VALUES);
-const DEFAULT_UPDATE_REPO_URL = "https://github.com/guohuiyuan/go-music-dl";
+const DEFAULT_UPDATE_REPO_URL = "https://github.com/twamix/LuMusic";
 const DEFAULT_GITHUB_PROXY_URL = "https://edgeone.gh-proxy.com";
 const OPEN_CONFIG_QUERY = "open_config";
 const GITHUB_PROXY_PRESETS = [

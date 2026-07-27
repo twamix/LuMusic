@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/guohuiyuan/go-music-dl/internal/web"
+	"github.com/twamix/LuMusic/internal/web"
 	"github.com/spf13/cobra"
 )
 

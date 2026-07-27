@@ -6,7 +6,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/guohuiyuan/go-music-dl/internal/appshell"
+	"github.com/twamix/LuMusic/internal/appshell"
 	"github.com/jchv/go-webview2"
 )
 

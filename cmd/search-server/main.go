@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/guohuiyuan/go-music-dl/core"
+	"github.com/twamix/LuMusic/core"
 )
 
 type searchResult struct {

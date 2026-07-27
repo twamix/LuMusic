@@ -7,7 +7,7 @@ import (
 	"log"
 
 	webview "github.com/Ghibranalj/webview_go"
-	"github.com/guohuiyuan/go-music-dl/internal/appshell"
+	"github.com/twamix/LuMusic/internal/appshell"
 )
 
 func main() {
