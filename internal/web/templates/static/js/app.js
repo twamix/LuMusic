@@ -3223,7 +3223,7 @@ function openUpdateModal(updateInfo = null) {
     const title = document.getElementById("appUpdateTitle");
     const summary = document.getElementById("appUpdateSummary");
     if (title) {
-      title.textContent = `关于 go-music-dl v${updateInfo.current_version || "-"}`;
+      title.textContent = `关于 LuMusic v${updateInfo.current_version || "-"}`;
     }
     if (summary) {
       summary.textContent = `当前版本 v${updateInfo.current_version || "-"}，GitHub 最新版本 v${updateInfo.latest_version || "-"}`;
@@ -3235,7 +3235,7 @@ function openUpdateModal(updateInfo = null) {
 
 async function openAboutAppModal() {
   const title = document.getElementById("appUpdateTitle");
-  if (title) title.textContent = "关于 go-music-dl";
+  if (title) title.textContent = "关于 LuMusic";
   const summary = document.getElementById("appUpdateSummary");
   if (summary) summary.textContent = "正在读取 GitHub 版本信息...";
   openUpdateModal();
