@@ -3233,15 +3233,6 @@ function openUpdateModal(updateInfo = null) {
   modal.style.display = "flex";
 }
 
-async function openAboutAppModal() {
-  const title = document.getElementById("appUpdateTitle");
-  if (title) title.textContent = "关于 LuMusic";
-  const summary = document.getElementById("appUpdateSummary");
-  if (summary) summary.textContent = "正在读取 GitHub 版本信息...";
-  openUpdateModal();
-  await checkAppUpdate({ showNoUpdate: true, silent: true });
-}
-
 function closeUpdateModal() {
   const modal = document.getElementById("appUpdateModal");
   if (modal) modal.style.display = "none";
@@ -4137,7 +4128,7 @@ function updateDocumentTitleForMedia(audio) {
   if (audio.artist) {
     parts.push(audio.artist);
   }
-  document.title = `${parts.join(" - ")} | music-dl`;
+  document.title = `${parts.join(" - ")} | LuMusic`;
 }
 
 function shouldPreserveMediaSessionMetadata() {
@@ -4164,7 +4155,7 @@ function updateMediaSessionMetadata(audio = getCurrentAPlayerAudio()) {
   }
 
   const metadata = {
-    title: audio.name || "music-dl",
+    title: audio.name || "LuMusic",
     artist: audio.artist || "",
   };
 
