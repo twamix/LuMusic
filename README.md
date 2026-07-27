@@ -256,7 +256,7 @@ docker compose -f docker-compose.dev.yml up -d --build --remove-orphans
 如果不使用 Compose，也可以直接通过命令行运行：
 
 ```bash
-docker run -d --name music-dl \
+docker run -d --name LuMusic \
   -p 8080:8080 \
   -v $(pwd)/data:/home/appuser/data \
   -e TZ=Asia/Shanghai \
@@ -265,7 +265,7 @@ docker run -d --name music-dl \
   ./music-dl web --port 8080 --no-browser
 
 # Windows PowerShell
-docker run -d --name music-dl -p 8080:8080 -v ${PWD}/data:/home/appuser/data -e TZ=Asia/Shanghai --restart unless-stopped ghcr.io/twamix/lumusic:latest ./music-dl web --port 8080 --no-browser
+docker run -d --name LuMusic -p 8080:8080 -v ${PWD}/data:/home/appuser/data -e TZ=Asia/Shanghai --restart unless-stopped ghcr.io/twamix/lumusic:latest ./music-dl web --port 8080 --no-browser
 
 ```
 

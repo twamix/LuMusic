@@ -1,7 +1,7 @@
 services:
-  music-dl:
+  LuMusic:
     image: ghcr.io/twamix/lumusic:latest
-    container_name: music-dl
+    container_name: LuMusic
     restart: unless-stopped
     user: "0:0"
     ports:
