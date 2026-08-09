@@ -6,9 +6,15 @@
 Dockerfile
 .dockerignore
 
-# Build artifacts
+# Build artifacts and non-Docker platforms
 music-dl
 music-dl.exe
+desktop/
+desktop_app/
+desktop_go/
+screenshots/
+winres/
+cmd/search-server/
 
 # Downloads
 downloads/

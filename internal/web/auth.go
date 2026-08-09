@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/guohuiyuan/go-music-dl/core"
+	"github.com/twamix/LuMusic/core"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -285,7 +285,7 @@ func authRequired(provider authSettingsProvider) gin.HandlerFunc {
 }
 
 func renderAuthPage(c *gin.Context, mode string, errMsg string, username string) {
-	title := "登录 music-dl"
+	title := "登录 LuMusic"
 	action := RoutePrefix + "/login"
 	button := "登录"
 	if mode == "setup" {

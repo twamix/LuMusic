@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/guohuiyuan/go-music-dl/core"
+	"github.com/twamix/LuMusic/core"
 	"github.com/guohuiyuan/music-lib/model"
 )
 
@@ -341,13 +341,6 @@ func Start(port string, shouldOpenBrowser bool) {
 	StartWithOptions(port, StartOptions{ShouldOpenBrowser: shouldOpenBrowser})
 }
 
-func StartDesktop(port string) {
-	StartWithOptions(port, StartOptions{
-		DisableAuth: true,
-		ListenHost:  "127.0.0.1",
-	})
-}
-
 func StartWithOptions(port string, opts StartOptions) {
 	core.CM.Load()
 	if !opts.DisableAuth {
@@ -395,6 +388,42 @@ func StartWithOptions(port string, opts StartOptions) {
 	os.MkdirAll(videoDir, 0755)
 
 	api := r.Group(RoutePrefix)
+	registerWebRoutes(api, opts, videoDir)
+
+	listenAddr := opts.ListenHost + ":" + port
+	listener, err := net.Listen("tcp", listenAddr)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "address already in use") {
+			fmt.Fprintf(os.Stderr, "Failed to start web server: port %s is already in use. Please use --port to specify another port, e.g. music-dl web --port 8081\n", port)
+			return
+		}
+		fmt.Fprintf(os.Stderr, "Failed to start web server on %s: %v\n", listenAddr, err)
+		return
+	}
+
+	urlHost := opts.ListenHost
+	if urlHost == "" || urlHost == "0.0.0.0" || urlHost == "::" {
+		urlHost = "localhost"
+	}
+	urlStr := "http://" + urlHost + ":" + port + "/"
+	fmt.Printf("Web started at %s\n", urlStr)
+	if opts.ShouldOpenBrowser {
+		go func() { time.Sleep(500 * time.Millisecond); core.OpenBrowser(urlStr) }()
+	}
+	if err := http.Serve(listener, r); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		fmt.Fprintf(os.Stderr, "Web server stopped with error: %v\n", err)
+	}
+}
+
+func rootIndexHandlers(opts StartOptions) []gin.HandlerFunc {
+	handlers := make([]gin.HandlerFunc, 0, 1)
+	handlers = append(handlers, func(c *gin.Context) {
+		renderIndex(c, nil, nil, "", nil, "", "song", "", "", "", false, "", nil)
+	})
+	return handlers
+}
+
+func registerWebRoutes(api *gin.RouterGroup, opts StartOptions, videoDir string) {
 
 	api.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -453,30 +482,6 @@ func StartWithOptions(port string, opts StartOptions) {
 	RegisterLocalMusicRoutes(api)
 	RegisterVideogenRoutes(api, videoDir)
 	RegisterUpdateRoutes(api)
-
-	listenAddr := opts.ListenHost + ":" + port
-	listener, err := net.Listen("tcp", listenAddr)
-	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "address already in use") {
-			fmt.Fprintf(os.Stderr, "Failed to start web server: port %s is already in use. Please use --port to specify another port, e.g. music-dl web --port 8081\n", port)
-			return
-		}
-		fmt.Fprintf(os.Stderr, "Failed to start web server on %s: %v\n", listenAddr, err)
-		return
-	}
-
-	urlHost := opts.ListenHost
-	if urlHost == "" || urlHost == "0.0.0.0" || urlHost == "::" {
-		urlHost = "localhost"
-	}
-	urlStr := "http://" + urlHost + ":" + port + RoutePrefix
-	fmt.Printf("Web started at %s\n", urlStr)
-	if opts.ShouldOpenBrowser {
-		go func() { time.Sleep(500 * time.Millisecond); core.OpenBrowser(urlStr) }()
-	}
-	if err := http.Serve(listener, r); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		fmt.Fprintf(os.Stderr, "Web server stopped with error: %v\n", err)
-	}
 }
 
 func bindAuthMiddleware(api *gin.RouterGroup, opts StartOptions) *gin.RouterGroup {

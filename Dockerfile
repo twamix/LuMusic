@@ -8,7 +8,11 @@ ARG TARGETARCH
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY . .
+COPY cmd ./cmd
+COPY core ./core
+COPY internal/cli ./internal/cli
+COPY internal/web ./internal/web
+COPY LICENSE README.md ./
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=${TARGETARCH:-$(go env GOARCH)} go build -o music-dl ./cmd/music-dl
 
 # Runtime stage
@@ -26,8 +30,6 @@ WORKDIR /home/appuser/
 
 COPY --from=builder /app/music-dl .
 RUN chown -R appuser:appuser /home/appuser/
-
-USER appuser
 
 EXPOSE 8080
 

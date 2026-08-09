@@ -11,7 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
-	"github.com/guohuiyuan/go-music-dl/core"
+	"github.com/twamix/LuMusic/core"
 	"github.com/guohuiyuan/music-lib/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"

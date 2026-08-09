@@ -330,3 +330,26 @@ func TestWebAuthSettingsDefaultAndPersist(t *testing.T) {
 		t.Fatalf("normalized Username = %q, want %q", got.Username, DefaultWebAuthUsername)
 	}
 }
+
+func TestWebAuthSettingsFallsBackWhenStoredValueIsInvalid(t *testing.T) {
+	baseDir := t.TempDir()
+	t.Setenv("MUSIC_DL_CONFIG_DB", filepath.Join(baseDir, "data", "settings.db"))
+	t.Setenv("MUSIC_DL_COOKIE_FILE", filepath.Join(baseDir, "data", "cookies.json"))
+	resetConfigStateForTest()
+	t.Cleanup(resetConfigStateForTest)
+
+	if err := ensureConfigDB(); err != nil {
+		t.Fatalf("ensure config db: %v", err)
+	}
+	if err := configDB.Save(&configKV{Key: webAuthSettingsKey, Value: "{"}).Error; err != nil {
+		t.Fatalf("save invalid auth settings: %v", err)
+	}
+
+	got, err := GetWebAuthSettings()
+	if err != nil {
+		t.Fatalf("get auth settings should fall back without error: %v", err)
+	}
+	if got.Username != DefaultWebAuthUsername || got.PasswordHash != "" || got.SessionSecret != "" {
+		t.Fatalf("fallback auth settings = %#v", got)
+	}
+}

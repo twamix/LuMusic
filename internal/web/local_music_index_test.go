@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/guohuiyuan/go-music-dl/core"
+	"github.com/twamix/LuMusic/core"
 )
 
 func TestLocalMusicIndexSyncUpsertsAndSweeps(t *testing.T) {

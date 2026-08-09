@@ -22,6 +22,13 @@ winres/desktop_go.winres.json
 *.idsig
 extra-release-assets/
 desktop_app/ffmpeg/android/
+desktop/
+desktop_app/
+desktop_go/
+screenshots/
+winres/
+internal/appshell/
+cmd/search-server/
 __debug_bin*
 *.keystore
 *.keystore.base64
