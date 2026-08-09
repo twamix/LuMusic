@@ -22,7 +22,7 @@ import (
 
 	"github.com/dhowden/tag"
 	"github.com/gin-gonic/gin"
-	"github.com/twamix/LuMusic/core"
+	"github.com/guohuiyuan/go-music-dl/core"
 	"github.com/guohuiyuan/music-lib/model"
 	"github.com/guohuiyuan/music-lib/utils"
 	"gorm.io/gorm/clause"
@@ -1352,6 +1352,7 @@ func probeLocalMusicTrack(track *localMusicTrack) (*localProbeResult, error) {
 	}
 
 	cmd := exec.Command(ffprobePath, "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", track.absPath)
+	core.HideCommandWindow(cmd)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, err

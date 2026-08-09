@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/twamix/LuMusic/internal/web"
+	"github.com/guohuiyuan/go-music-dl/internal/web"
 )
 
 const (
@@ -22,11 +22,11 @@ const (
 )
 
 func AppURL(port string) string {
-	return fmt.Sprintf("http://%s:%s/", loopbackHost, normalizePort(port))
+	return fmt.Sprintf("http://%s:%s%s/", loopbackHost, normalizePort(port), web.RoutePrefix)
 }
 
 func HealthURL(port string) string {
-	return fmt.Sprintf("http://%s:%s/healthz", loopbackHost, normalizePort(port))
+	return fmt.Sprintf("http://%s:%s%s/healthz", loopbackHost, normalizePort(port), web.RoutePrefix)
 }
 
 func StartDesktopServerAndWait(ctx context.Context, port string) (string, error) {

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/twamix/LuMusic/core"
+	"github.com/guohuiyuan/go-music-dl/core"
 )
 
 func TestNextSearchTypeCyclesAllModes(t *testing.T) {

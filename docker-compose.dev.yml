@@ -1,11 +1,10 @@
 services:
-  LuMusic:
+  music-dl:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: LuMusic-dev
+    container_name: music-dl-dev
     restart: unless-stopped
-    user: "0:0"
     ports:
       - "8080:8080"
     volumes:

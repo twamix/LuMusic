@@ -18,8 +18,9 @@ const DOWNLOAD_DIR_PRESET_VALUES = [
   "/sdcard/Download",
 ];
 const DOWNLOAD_DIR_PRESETS = new Set(DOWNLOAD_DIR_PRESET_VALUES);
-const DEFAULT_UPDATE_REPO_URL = "https://github.com/twamix/LuMusic";
+const DEFAULT_UPDATE_REPO_URL = "https://github.com/guohuiyuan/go-music-dl";
 const DEFAULT_GITHUB_PROXY_URL = "https://edgeone.gh-proxy.com";
+const BATCH_DOWNLOAD_NOTICE_MS = 4200;
 const OPEN_CONFIG_QUERY = "open_config";
 const GITHUB_PROXY_PRESETS = [
   "https://edgeone.gh-proxy.com",
@@ -43,7 +44,7 @@ let webSettings = {
   cliPageSize: DEFAULT_CLI_PAGE_SIZE,
   autoCheckUpdate: true,
   autoSwitchInvalidSources: true,
-  autoCacheOnPlay: true,
+  autoCacheOnPlay: false,
   updateRepoUrl: DEFAULT_UPDATE_REPO_URL,
   githubProxyEnabled: false,
   githubProxyUrl: DEFAULT_GITHUB_PROXY_URL,
@@ -64,7 +65,7 @@ function normalizeWebSettings(raw) {
     cliPageSize: DEFAULT_CLI_PAGE_SIZE,
     autoCheckUpdate: true,
     autoSwitchInvalidSources: true,
-    autoCacheOnPlay: true,
+    autoCacheOnPlay: false,
     updateRepoUrl: DEFAULT_UPDATE_REPO_URL,
     githubProxyEnabled: false,
     githubProxyUrl: DEFAULT_GITHUB_PROXY_URL,
@@ -683,14 +684,20 @@ function showToast(title, message = "", type = "info", duration = 0) {
   ].join("");
   container.appendChild(toast);
 
-  const close = () => {
+  const close = (immediate = false) => {
+    if (!toast.isConnected) return;
+    if (immediate) {
+      toast.remove();
+      return;
+    }
     toast.classList.add("app-toast-hide");
     window.setTimeout(() => toast.remove(), 220);
   };
-  toast.querySelector(".app-toast-close")?.addEventListener("click", close);
+  toast.querySelector(".app-toast-close")?.addEventListener("click", () => close());
   if (duration > 0) {
     window.setTimeout(close, duration);
   }
+  return close;
 }
 
 function inferExtFromContentType(contentType) {
@@ -943,7 +950,7 @@ let currentPlayingId = null;
 window.currentPlayingId = null;
 
 function isAutoCacheOnPlayEnabled() {
-  return webSettings.autoCacheOnPlay !== false;
+  return webSettings.autoCacheOnPlay === true;
 }
 
 function scheduleAutoCache(audio) {
@@ -3223,7 +3230,7 @@ function openUpdateModal(updateInfo = null) {
     const title = document.getElementById("appUpdateTitle");
     const summary = document.getElementById("appUpdateSummary");
     if (title) {
-      title.textContent = `关于 LuMusic v${updateInfo.current_version || "-"}`;
+      title.textContent = `关于 go-music-dl v${updateInfo.current_version || "-"}`;
     }
     if (summary) {
       summary.textContent = `当前版本 v${updateInfo.current_version || "-"}，GitHub 最新版本 v${updateInfo.latest_version || "-"}`;
@@ -3231,6 +3238,15 @@ function openUpdateModal(updateInfo = null) {
   }
 
   modal.style.display = "flex";
+}
+
+async function openAboutAppModal() {
+  const title = document.getElementById("appUpdateTitle");
+  if (title) title.textContent = "关于 go-music-dl";
+  const summary = document.getElementById("appUpdateSummary");
+  if (summary) summary.textContent = "正在读取 GitHub 版本信息...";
+  openUpdateModal();
+  await checkAppUpdate({ showNoUpdate: true, silent: true });
 }
 
 function closeUpdateModal() {
@@ -3255,9 +3271,35 @@ function renderUtilityModalPagination(page, totalPages, onPageChange) {
 async function openDownloadRecordsModal() {
   const modal = document.getElementById("downloadRecordsModal");
   if (!modal) return;
+  setDownloadRecordsButtonState("idle");
   modal.style.display = "flex";
 
   await loadDownloadRecordsPage(1);
+}
+
+function setDownloadRecordsButtonState(state = "idle") {
+  const button = document.getElementById("download-records-button");
+  if (!button) return;
+
+  const downloading = state === "downloading";
+  const updated = state === "updated";
+  button.classList.toggle("is-downloading", downloading);
+  button.classList.toggle("has-download-updates", updated);
+
+  const label = downloading
+    ? "下载记录，批量下载进行中"
+    : updated
+      ? "下载记录，有新的下载结果"
+      : "下载记录";
+  button.title = label;
+  button.setAttribute("aria-label", label);
+}
+
+async function refreshOpenDownloadRecords() {
+  const modal = document.getElementById("downloadRecordsModal");
+  if (!modal || modal.style.display !== "flex") return false;
+  await loadDownloadRecordsPage(1);
+  return true;
 }
 
 async function loadDownloadRecordsPage(page = 1) {
@@ -4128,7 +4170,7 @@ function updateDocumentTitleForMedia(audio) {
   if (audio.artist) {
     parts.push(audio.artist);
   }
-  document.title = `${parts.join(" - ")} | LuMusic`;
+  document.title = `${parts.join(" - ")} | music-dl`;
 }
 
 function shouldPreserveMediaSessionMetadata() {
@@ -4155,7 +4197,7 @@ function updateMediaSessionMetadata(audio = getCurrentAPlayerAudio()) {
   }
 
   const metadata = {
-    title: audio.name || "LuMusic",
+    title: audio.name || "music-dl",
     artist: audio.artist || "",
   };
 
@@ -4698,6 +4740,11 @@ const KaraokeLyrics = (() => {
       if (!response.ok) return;
       const raw = await response.text();
       if (key !== currentKey) return;
+      if (!floatingLyricsEnabled()) {
+        currentKey = "";
+        hide();
+        return;
+      }
       const parsed = parse(raw);
       if (parsed.type !== "karaoke") {
         hide();
@@ -5828,94 +5875,7 @@ function getSelectedSongs() {
   return songs;
 }
 
-// ==========================================
-// 下载中面板
-// ==========================================
-
-let downloadPanelItems = [];
-
-function showDownloadPanel(songs) {
-  const panel = document.getElementById("download-panel");
-  const body = document.getElementById("download-panel-body");
-  const footer = document.getElementById("download-panel-footer");
-  if (!panel || !body || !footer) return;
-
-  downloadPanelItems = songs.map((s, i) => ({
-    index: i,
-    name: s.name || "",
-    artist: s.artist || "",
-    status: "wait", // wait / loading / success / skipped / failed
-    msg: "",
-  }));
-
-  body.innerHTML = downloadPanelItems
-    .map(
-      (item) => `
-    <div class="download-panel-item" id="dp-item-${item.index}">
-      <span class="dp-icon dp-wait"><i class="fa-regular fa-circle"></i></span>
-      <span>${escapeHtml(item.artist)} - ${escapeHtml(item.name)}</span>
-    </div>`,
-    )
-    .join("");
-
-  footer.textContent = `共 ${songs.length} 首 · 完成 0/${songs.length}`;
-  panel.style.display = "flex";
-}
-
-function updateDownloadPanelItem(index, status, msg) {
-  const item = downloadPanelItems[index];
-  if (!item) return;
-  item.status = status;
-  item.msg = msg || "";
-
-  const el = document.getElementById(`dp-item-${index}`);
-  if (!el) return;
-
-  const iconMap = {
-    wait: '<i class="fa-regular fa-circle"></i>',
-    loading: '<i class="fa-solid fa-spinner fa-spin"></i>',
-    success: '<i class="fa-solid fa-check-circle"></i>',
-    skipped: '<i class="fa-solid fa-forward-step"></i>',
-    failed: '<i class="fa-solid fa-circle-exclamation"></i>',
-  };
-  const clsMap = {
-    wait: "dp-wait",
-    loading: "dp-loading",
-    success: "dp-success",
-    skipped: "dp-skipped",
-    failed: "dp-failed",
-  };
-
-  const icon = el.querySelector(".dp-icon");
-  if (icon) {
-    icon.className = `dp-icon ${clsMap[status] || "dp-wait"}`;
-    icon.innerHTML = iconMap[status] || iconMap.wait;
-  }
-
-  // 正在下载的项滚动到面板中间
-  if (status === "loading") {
-    el.scrollIntoView({ block: "center", behavior: "smooth" });
-  }
-
-  // 更新底部统计
-  const done = downloadPanelItems.filter(
-    (x) => x.status === "success" || x.status === "skipped" || x.status === "failed",
-  ).length;
-  const footer = document.getElementById("download-panel-footer");
-  if (footer) {
-    footer.textContent = `共 ${downloadPanelItems.length} 首 · 完成 ${done}/${downloadPanelItems.length}`;
-  }
-}
-
-function closeDownloadPanel() {
-  const panel = document.getElementById("download-panel");
-  if (panel) panel.style.display = "none";
-}
-
 async function batchDownload() {
-  // 关闭旧面板，准备新任务
-  closeDownloadPanel();
-
   const selectedSongs = getSelectedSongs();
   const songs = selectedSongs.filter(
     (song) => !isLocalMusicSourceValue(song.source),
@@ -5930,34 +5890,7 @@ async function batchDownload() {
   const batchSwitch = document.getElementById("btn-batch-switch");
   const originalBatchDlHTML = batchDl ? batchDl.innerHTML : "";
 
-  const skipText =
-    skippedLocalCount > 0 ? `\n已跳过 ${skippedLocalCount} 首本地歌曲。` : "";
-
-  // 预检：统计会跳过的数量
-  let precheckSkipText = "";
-  try {
-    const preResp = await fetch(`${API_ROOT}/api/downloads/precheck`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        songs: songs.map((s) => ({ name: s.name, artist: s.artist })),
-      }),
-    });
-    if (preResp.ok) {
-      const preData = await preResp.json();
-      if (preData.skipped > 0) {
-        precheckSkipText = `\n其中 ${preData.skipped} 首已在本地曲库（将自动跳过）`;
-      }
-    }
-  } catch (_) {}
-
-  if (
-    !confirm(
-      `准备将 ${songs.length} 首歌曲保存到本地目录:\n${webSettings.downloadDir}${skipText}${precheckSkipText}`,
-    )
-  ) {
-    return;
-  }
+  if (!confirm(`确认批量下载 ${songs.length} 首歌曲？`)) return;
 
   if (batchDl) {
     batchDl.disabled = true;
@@ -5967,57 +5900,58 @@ async function batchDownload() {
     batchSwitch.disabled = true;
   }
 
-  // 显示下载中面板
-  showDownloadPanel(songs);
+  setDownloadRecordsButtonState("downloading");
+  const ignoredLocalText =
+    skippedLocalCount > 0 ? `，已忽略 ${skippedLocalCount} 首本地歌曲` : "";
+  const dismissBatchStartNotice = showToast(
+    "批量下载已开始",
+    `正在保存 ${songs.length} 首歌曲${ignoredLocalText}，进度与结果请查看右侧“下载记录”。`,
+    "info",
+    BATCH_DOWNLOAD_NOTICE_MS,
+  );
 
   let success = 0;
+  let skipped = 0;
+  let failed = 0;
   let warningCount = 0;
-  const failures = [];
 
   try {
-    for (let i = 0; i < songs.length; i++) {
-      const song = songs[i];
-      updateDownloadPanelItem(i, "loading");
+    for (const song of songs) {
       try {
         const result = await requestLocalDownload(song.url);
-        // 判断是否跳过
         if (result && result.skipped) {
-          updateDownloadPanelItem(i, "skipped");
+          skipped++;
         } else {
-          updateDownloadPanelItem(i, "success");
           success++;
           if (result && result.warning) {
             warningCount++;
           }
         }
-      } catch (error) {
-        updateDownloadPanelItem(i, "failed", error && error.message ? error.message : "下载失败");
-        failures.push({
-          song,
-          reason: error && error.message ? error.message : "下载失败",
-        });
+      } catch (_) {
+        failed++;
       }
     }
 
-    // 不再弹出 toast，面板常驻由用户手动关闭
-
-    let message = `本地保存完成，成功 ${success}/${songs.length}`;
-
+    const summary = [`成功 ${success}`, `跳过 ${skipped}`, `失败 ${failed}`];
     if (skippedLocalCount > 0) {
-      message += `\n已跳过 ${skippedLocalCount} 首本地歌曲。`;
+      summary.push(`忽略本地 ${skippedLocalCount}`);
     }
-    message += `\n目录：${webSettings.downloadDir}`;
     if (warningCount > 0) {
-      message += `\n\n共 ${warningCount} 首触发了降级提示，请查看终端日志`;
+      summary.push(`降级提示 ${warningCount}`);
     }
-    message += buildBatchFailureMessage(failures, "失败");
 
+    dismissBatchStartNotice(true);
     showToast(
-      failures.length > 0 ? "下载部分完成" : "下载完成",
-      message,
-      failures.length > 0 ? "warning" : "success",
-      0,
+      failed > 0 ? "批量下载部分完成" : "批量下载完成",
+      `${summary.join("，")}。详情请查看右侧“下载记录”。`,
+      failed > 0 ? "warning" : "success",
+      BATCH_DOWNLOAD_NOTICE_MS,
     );
+
+    setDownloadRecordsButtonState("updated");
+    if (await refreshOpenDownloadRecords()) {
+      setDownloadRecordsButtonState("idle");
+    }
   } finally {
     if (batchDl) {
       batchDl.innerHTML = originalBatchDlHTML;

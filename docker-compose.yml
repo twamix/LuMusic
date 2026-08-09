@@ -1,9 +1,8 @@
 services:
-  LuMusic:
-    image: ghcr.io/twamix/lumusic:latest
-    container_name: LuMusic
+  music-dl:
+    image: guohuiyuan/go-music-dl:latest
+    container_name: music-dl
     restart: unless-stopped
-    user: "0:0"
     ports:
       - "8080:8080"
     volumes:

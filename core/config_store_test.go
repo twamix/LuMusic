@@ -116,8 +116,8 @@ func TestWebSettingsDefaultAndPersist(t *testing.T) {
 	if !defaults.AutoSwitchInvalidSources {
 		t.Fatalf("default AutoSwitchInvalidSources should be true")
 	}
-	if !defaults.AutoCacheOnPlay {
-		t.Fatalf("default AutoCacheOnPlay should be true")
+	if defaults.AutoCacheOnPlay {
+		t.Fatalf("default AutoCacheOnPlay should be false")
 	}
 	if defaults.UpdateRepoURL != DefaultUpdateRepoURL {
 		t.Fatalf("default UpdateRepoURL mismatch: got %q want %q", defaults.UpdateRepoURL, DefaultUpdateRepoURL)
@@ -152,7 +152,7 @@ func TestWebSettingsDefaultAndPersist(t *testing.T) {
 		DownloadConcurrency:      5,
 		AutoCheckUpdate:          false,
 		AutoSwitchInvalidSources: false,
-		AutoCacheOnPlay:          false,
+		AutoCacheOnPlay:          true,
 		UpdateRepoURL:            "https://github.com/example/fork",
 		GithubProxyEnabled:       true,
 		GithubProxyURL:           "https://gh-proxy.com/",
@@ -176,7 +176,7 @@ func TestWebSettingsDefaultAndPersist(t *testing.T) {
 		DownloadConcurrency:      5,
 		AutoCheckUpdate:          false,
 		AutoSwitchInvalidSources: false,
-		AutoCacheOnPlay:          false,
+		AutoCacheOnPlay:          true,
 		UpdateRepoURL:            "https://github.com/example/fork",
 		GithubProxyEnabled:       true,
 		GithubProxyURL:           "https://gh-proxy.com/",
@@ -250,7 +250,7 @@ func TestWebSettingsDefaultAndPersist(t *testing.T) {
 	}
 }
 
-func TestWebSettingsLegacyPayloadDefaultsEnabledSwitches(t *testing.T) {
+func TestWebSettingsLegacyPayloadUsesCurrentSwitchDefaults(t *testing.T) {
 	baseDir := t.TempDir()
 	t.Setenv("MUSIC_DL_CONFIG_DB", filepath.Join(baseDir, "data", "settings.db"))
 	t.Setenv("MUSIC_DL_COOKIE_FILE", filepath.Join(baseDir, "data", "cookies.json"))
@@ -276,8 +276,8 @@ func TestWebSettingsLegacyPayloadDefaultsEnabledSwitches(t *testing.T) {
 	if !got.AutoSwitchInvalidSources {
 		t.Fatalf("legacy settings should default AutoSwitchInvalidSources to true: %#v", got)
 	}
-	if !got.AutoCacheOnPlay {
-		t.Fatalf("legacy settings should default AutoCacheOnPlay to true: %#v", got)
+	if got.AutoCacheOnPlay {
+		t.Fatalf("legacy settings should default AutoCacheOnPlay to false: %#v", got)
 	}
 }
 
@@ -328,28 +328,5 @@ func TestWebAuthSettingsDefaultAndPersist(t *testing.T) {
 	}
 	if got.Username != DefaultWebAuthUsername {
 		t.Fatalf("normalized Username = %q, want %q", got.Username, DefaultWebAuthUsername)
-	}
-}
-
-func TestWebAuthSettingsFallsBackWhenStoredValueIsInvalid(t *testing.T) {
-	baseDir := t.TempDir()
-	t.Setenv("MUSIC_DL_CONFIG_DB", filepath.Join(baseDir, "data", "settings.db"))
-	t.Setenv("MUSIC_DL_COOKIE_FILE", filepath.Join(baseDir, "data", "cookies.json"))
-	resetConfigStateForTest()
-	t.Cleanup(resetConfigStateForTest)
-
-	if err := ensureConfigDB(); err != nil {
-		t.Fatalf("ensure config db: %v", err)
-	}
-	if err := configDB.Save(&configKV{Key: webAuthSettingsKey, Value: "{"}).Error; err != nil {
-		t.Fatalf("save invalid auth settings: %v", err)
-	}
-
-	got, err := GetWebAuthSettings()
-	if err != nil {
-		t.Fatalf("get auth settings should fall back without error: %v", err)
-	}
-	if got.Username != DefaultWebAuthUsername || got.PasswordHash != "" || got.SessionSecret != "" {
-		t.Fatalf("fallback auth settings = %#v", got)
 	}
 }

@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/twamix/LuMusic/core"
+	"github.com/guohuiyuan/go-music-dl/core"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -208,31 +208,31 @@ func validateSessionValue(settings core.WebAuthSettings, value string, now time.
 
 func setAuthCookie(c *gin.Context, value string) {
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie(authCookieName, value, int(sessionMaxAge.Seconds()), routeHomePath(), "", c.Request.TLS != nil, true)
+	c.SetCookie(authCookieName, value, int(sessionMaxAge.Seconds()), RoutePrefix, "", c.Request.TLS != nil, true)
 }
 
 func clearAuthCookie(c *gin.Context) {
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie(authCookieName, "", -1, routeHomePath(), "", c.Request.TLS != nil, true)
+	c.SetCookie(authCookieName, "", -1, RoutePrefix, "", c.Request.TLS != nil, true)
 }
 
 func safeAuthRedirectTarget(raw string) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return routeHomePath()
+		return RoutePrefix
 	}
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.IsAbs() || strings.HasPrefix(raw, "//") {
-		return routeHomePath()
+		return RoutePrefix
 	}
 	if parsed.Path == "" {
-		return routeHomePath()
+		return RoutePrefix
 	}
-	if RoutePrefix != "" && parsed.Path != RoutePrefix && !strings.HasPrefix(parsed.Path, RoutePrefix+"/") {
-		return routeHomePath()
+	if parsed.Path != RoutePrefix && !strings.HasPrefix(parsed.Path, RoutePrefix+"/") {
+		return RoutePrefix
 	}
 	if parsed.Path == RoutePrefix+"/login" || parsed.Path == RoutePrefix+"/setup" {
-		return routeHomePath()
+		return RoutePrefix
 	}
 	return parsed.String()
 }
@@ -285,7 +285,7 @@ func authRequired(provider authSettingsProvider) gin.HandlerFunc {
 }
 
 func renderAuthPage(c *gin.Context, mode string, errMsg string, username string) {
-	title := "登录 LuMusic"
+	title := "登录 music-dl"
 	action := RoutePrefix + "/login"
 	button := "登录"
 	if mode == "setup" {
@@ -443,6 +443,6 @@ func bindAuthRoutes(api *gin.RouterGroup) {
 
 	api.POST("/logout", func(c *gin.Context) {
 		clearAuthCookie(c)
-		c.Redirect(http.StatusFound, routeHomePath())
+		c.Redirect(http.StatusFound, RoutePrefix)
 	})
 }

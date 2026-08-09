@@ -6,8 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/twamix/LuMusic/core"
-	"github.com/twamix/LuMusic/internal/cli"
+	"github.com/guohuiyuan/go-music-dl/core"
+	"github.com/guohuiyuan/go-music-dl/internal/cli"
 )
 
 // 全局配置变量

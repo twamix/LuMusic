@@ -1,6 +1,6 @@
 # Go Music DL Desktop
 
-桌面客户端版本的 [Go Music DL](https://github.com/twamix/LuMusic)，提供原生桌面窗口体验，无需打开浏览器即可使用完整的 Web 界面功能。
+桌面客户端版本的 [Go Music DL](https://github.com/guohuiyuan/go-music-dl)，提供原生桌面窗口体验，无需打开浏览器即可使用完整的 Web 界面功能。
 
 ## ✨ 特性
 
@@ -47,7 +47,7 @@
 
 ### 下载使用
 
-1. 从 [Releases](https://github.com/twamix/LuMusic/releases) 页面下载对应平台的压缩包
+1. 从 [Releases](https://github.com/guohuiyuan/go-music-dl/releases) 页面下载对应平台的压缩包
 2. 解压到任意目录
 3. 双击运行可执行文件
 4. 应用将自动启动内置 Web 服务器并打开桌面窗口
@@ -235,8 +235,8 @@ cargo deb --no-build
 
 - [Tao](https://github.com/tauri-apps/tao) - 窗口管理框架
 - [Wry](https://github.com/tauri-apps/wry) - WebView 绑定
-- [Go Music DL](https://github.com/twamix/LuMusic) - 后端音乐服务
+- [Go Music DL](https://github.com/guohuiyuan/go-music-dl) - 后端音乐服务
 
 ---
 
-**注意**: 这是一个桌面客户端项目，核心音乐功能由 [Go Music DL](https://github.com/twamix/LuMusic) 提供。
+**注意**: 这是一个桌面客户端项目，核心音乐功能由 [Go Music DL](https://github.com/guohuiyuan/go-music-dl) 提供。

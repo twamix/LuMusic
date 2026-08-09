@@ -16,7 +16,7 @@ import (
 	"github.com/gioui-plugins/gio-plugins/hyperlink/giohyperlink"
 	"github.com/gioui-plugins/gio-plugins/plugin/gioplugins"
 	"github.com/gioui-plugins/gio-plugins/webviewer/giowebview"
-	"github.com/twamix/LuMusic/internal/appshell"
+	"github.com/guohuiyuan/go-music-dl/internal/appshell"
 
 	_ "gioui.org/app/permission/storage"
 	_ "gioui.org/app/permission/wakelock"

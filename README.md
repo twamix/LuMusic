@@ -14,11 +14,11 @@ Go Music DL 是一个音乐搜索与下载工具，支持 **Web 界面**、**TUI
 
 最简单的使用方式，下载即用：
 
-1. 从 [Releases](https://github.com/twamix/LuMusic/releases) 下载 `music-dl-desktop-rust.exe` 或 `music-dl-desktop-go.exe`
+1. 从 [Releases](https://github.com/guohuiyuan/go-music-dl/releases) 下载 `music-dl-desktop-rust.exe` 或 `music-dl-desktop-go.exe`
 2. 解压，双击运行
 3. 享受原生桌面体验！
 
-移动端下载说明：在 [Releases](https://github.com/twamix/LuMusic/releases) 页面可直接下载 Android `music-dl_arm64-v8a.apk`（推荐）/ `music-dl_x86_64.apk` / `music-dl.apk`（无分片兼容包）。Android APK 已内置 `ffmpeg` 与 `ffprobe`，本地音乐探测、非 MP3 元数据内嵌和视频渲染无需在手机上额外安装 FFmpeg。iOS 会提供 `music-dl-ios-unsigned.ipa` 给用户自行签名；如果发布环境配置了证书，也会额外提供已签名的 `music-dl-ios.ipa`。
+移动端下载说明：在 [Releases](https://github.com/guohuiyuan/go-music-dl/releases) 页面可直接下载 Android `music-dl_arm64-v8a.apk`（推荐）/ `music-dl_x86_64.apk` / `music-dl.apk`（无分片兼容包）。Android APK 已内置 `ffmpeg` 与 `ffprobe`，本地音乐探测、非 MP3 元数据内嵌和视频渲染无需在手机上额外安装 FFmpeg。iOS 会提供 `music-dl-ios-unsigned.ipa` 给用户自行签名；如果发布环境配置了证书，也会额外提供已签名的 `music-dl-ios.ipa`。
 
 ### Web 模式
 
@@ -158,7 +158,7 @@ ffmpeg -version
 
 ## 新增改动（简要）
 
-* **播放自动缓存开关**：系统设置新增“播放时自动缓存本地音乐”，默认开启；关闭后在线歌曲不会再发起新的后台缓存请求。
+* **播放自动缓存开关**：系统设置提供“播放时自动缓存本地音乐”，默认关闭，避免持续占用储存空间；需要时可手动开启。
 * **本地音乐分页与同步优化**：本地音乐分页在切换每页条数或连续翻页时会保留最后一次请求并对短暂网络错误重试，避免直接显示 `Failed to fetch`；上传、删除、播放时本地缓存和后台扫描会自动同步 SQLite 索引，因此已移除界面的“刷新索引”按钮。重复检测弹窗删除歌曲后会同步刷新底部列表、总数和分页。
 * **本地已有匹配更准确**：在线结果带有歌手信息时，“本地已有”必须同时匹配歌名和歌手；同名但不同歌手的歌曲不会再被标记为本地已有或错误改用本地文件播放。
 * **播放器控件调整**：播放顺序 / 随机 / 单曲循环切换按钮改为封面上方的图标按钮，不再遮挡播放或暂停操作。
@@ -207,7 +207,7 @@ ffmpeg -version
 
 本项目提供了多种 Docker 部署方式。当前默认通过 `./data` 目录挂载到容器内 `/home/appuser/data`，下载文件、配置与收藏数据都会持久化到该目录。
 
-*注意：首次运行前请确保宿主机 `data` 目录存在且当前用户可写，便于容器持久化下载与配置数据。*
+*注意：首次运行前必须先创建 `data` 目录（如 `mkdir -p data && chmod 777 data`），便于宿主机直接访问下载与配置数据。*
 
 #### 1. 生产环境部署（推荐）
 
@@ -235,11 +235,11 @@ docker compose down
 
 **说明：**
 
-* 自动拉取 `ghcr.io/twamix/lumusic:latest` 镜像
+* 自动拉取 `guohuiyuan/go-music-dl:latest` 镜像
 * 支持后台运行和自动重启
 * 默认使用 `./data` 本地目录做数据持久化，便于直接查看和备份
 * 设置时区为亚洲上海
-* 默认直接使用容器内置账号启动；如宿主机挂载目录存在权限问题，可在 compose 中显式调整 `user` 配置
+* 以非root用户(uid=1000)运行，提高安全性
 
 #### 2. 开发环境部署（本地构建）
 
@@ -256,16 +256,17 @@ docker compose -f docker-compose.dev.yml up -d --build --remove-orphans
 如果不使用 Compose，也可以直接通过命令行运行：
 
 ```bash
-docker run -d --name LuMusic \
+docker run -d --name music-dl \
   -p 8080:8080 \
   -v $(pwd)/data:/home/appuser/data \
   -e TZ=Asia/Shanghai \
+  --user 1000:1000 \
   --restart unless-stopped \
-  ghcr.io/twamix/lumusic:latest \
+  guohuiyuan/go-music-dl:latest \
   ./music-dl web --port 8080 --no-browser
 
 # Windows PowerShell
-docker run -d --name LuMusic -p 8080:8080 -v ${PWD}/data:/home/appuser/data -e TZ=Asia/Shanghai --restart unless-stopped ghcr.io/twamix/lumusic:latest ./music-dl web --port 8080 --no-browser
+docker run -d --name music-dl -p 8080:8080 -v ${PWD}/data:/home/appuser/data -e TZ=Asia/Shanghai --user 1000:1000 --restart unless-stopped guohuiyuan/go-music-dl:latest ./music-dl web --port 8080 --no-browser
 
 ```
 
@@ -364,7 +365,7 @@ adb install -r music-dl.apk
 * 校验三个 APK 都包含对应 ABI 的 `ffmpeg/ffprobe`，不包含旧的 `libffmpeg.so/libffprobe.so` 条目，且签名有效
 * 上传 `music-dl_arm64-v8a.apk`、`music-dl_x86_64.apk`、`music-dl.apk` 到 Actions Artifacts 和 GitHub Release
 
-发布后可在 [Releases](https://github.com/twamix/LuMusic/releases) 下载三个 APK，推荐优先使用 `music-dl_arm64-v8a.apk`；极个别设备若无法安装/运行，再下载 `music-dl.apk`（无分片兼容包）。
+发布后可在 [Releases](https://github.com/guohuiyuan/go-music-dl/releases) 下载三个 APK，推荐优先使用 `music-dl_arm64-v8a.apk`；极个别设备若无法安装/运行，再下载 `music-dl.apk`（无分片兼容包）。
 
 #### 3. Java 17 与 Build-Tools 版本说明（重点）
 
@@ -421,7 +422,7 @@ IOS_UNSIGNED_ONLY=1 ./package_ios.sh
 * `music-dl-ios.ipa`：已签名真机安装包，需要 `IOS_PROVISION_PROFILE` 指向匹配 `IOS_APP_ID` 的 `.mobileprovision`
 * `music-dl-ios-unsigned.ipa`：真机架构待签名包，仅用于用户自行重签，不能直接安装
 
-发布后可在 [Releases](https://github.com/twamix/LuMusic/releases) 下载 `music-dl-ios-unsigned.ipa`；配置签名 secrets 后也会上传 `music-dl-ios.ipa`。
+发布后可在 [Releases](https://github.com/guohuiyuan/go-music-dl/releases) 下载 `music-dl-ios-unsigned.ipa`；配置签名 secrets 后也会上传 `music-dl-ios.ipa`。
 
 > 注意：`music-dl-ios-unsigned.ipa` 不是可直接安装包，需要用户用自己的证书和 provisioning profile 重签。如果需要 GitHub Actions 自动发布已签名 iOS 包，需要配置 `IOS_PROVISION_PROFILE_BASE64`、`IOS_CERTIFICATE_P12_BASE64` 和 `IOS_CERTIFICATE_PASSWORD`。
 
@@ -651,4 +652,4 @@ go-music-dl/
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/image?repos=twamix/LuMusic&type=date&legend=top-left)](https://www.star-history.com/?repos=twamix%2FLuMusic&type=date&legend=top-left)
+[![Star History Chart](https://api.star-history.com/image?repos=guohuiyuan/go-music-dl&type=date&legend=top-left)](https://www.star-history.com/?repos=guohuiyuan%2Fgo-music-dl&type=date&legend=top-left)

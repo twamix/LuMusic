@@ -171,6 +171,9 @@ func TestAppJSIncludesAjaxNavigationEntryPoints(t *testing.T) {
 	if !strings.Contains(js, "function checkAppUpdate(options = {})") {
 		t.Fatal("app.js missing GitHub update check")
 	}
+	if !strings.Contains(js, "async function openAboutAppModal()") {
+		t.Fatal("app.js missing openAboutAppModal entry point")
+	}
 	if !strings.Contains(js, `async function openLatestUpdatePage(target = "download")`) {
 		t.Fatal("app.js missing openLatestUpdatePage helper")
 	}
@@ -362,6 +365,8 @@ func TestSettingsModalIncludesDownloadDirPresets(t *testing.T) {
 		`id="setting-auto-cache-on-play"`,
 		`id="setting-floating-lyrics"`,
 		`id="setting-auto-switch-invalid-sources"`,
+		`onclick="openAboutAppModal()"`,
+		`关于 go-music-dl`,
 		`class="cookie-item setting-item setting-link-row"`,
 		`setting-link-icon`,
 		`setting-link-title`,
@@ -393,8 +398,6 @@ func TestSettingsModalIncludesDownloadDirPresets(t *testing.T) {
 		`id="updateGithubProxyCustom"`,
 		`onchange="applyUpdateProxyVisibility()"`,
 		`onclick="testUpdateGithubProxy()"`,
-		`onclick="openAboutAppModal()"`,
-		`关于 LuMusic`,
 		`btn-pill btn-pill-primary" onclick="openAboutAppModal()"`,
 		`setting-action-row`,
 	} {

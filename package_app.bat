@@ -107,7 +107,7 @@ gogio -target android ^
  -slice ^
  -signkey "%ANDROID_KEYSTORE_FILE%" ^
  -signpass "%ANDROID_KEYSTORE_PASSWORD%" ^
- github.com/twamix/LuMusic/desktop_app
+ github.com/guohuiyuan/go-music-dl/desktop_app
 if errorlevel 1 (
 	echo ERROR: gogio build failed.
 	exit /b 1

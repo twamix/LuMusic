@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="referrer" content="no-referrer">
-    <title>LuMusic - 聚合搜索与解析</title>
+    <title>music-dl - 聚合搜索与解析</title>
     <link rel="icon" href="{{.Root}}/icon.png" type="image/png">
     
     <link rel="stylesheet" href="{{.Root}}/style.css">
@@ -12,18 +12,9 @@
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aplayer/dist/APlayer.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sakana-widget@2.7.1/lib/sakana.min.css"/>
 </head>
 <body>
-
-<!-- 下载中面板 -->
-<div id="download-panel" class="download-panel" style="display:none;">
-    <div class="download-panel-header">
-        <span><i class="fa-solid fa-download"></i> 下载中</span>
-        <span class="download-panel-close" onclick="closeDownloadPanel()">&times;</span>
-    </div>
-    <div class="download-panel-body" id="download-panel-body"></div>
-    <div class="download-panel-footer" id="download-panel-footer"></div>
-</div>
 
 <!-- 右侧工具栏：设置、历史和本地音乐在所有页面均可使用 -->
 <div class="right-toolbar">
@@ -33,7 +24,10 @@
         <button id="auth-float-button" type="submit"><i id="auth-float-icon" class="fa-solid fa-right-to-bracket"></i></button>
     </form>
     <div class="rt-btn" onclick="openLocalMusicPage()" title="本地音乐"><i class="fa-solid fa-folder-plus"></i></div>
-    <div class="rt-btn" onclick="openDownloadRecordsModal()" title="下载记录"><i class="fa-solid fa-clock-rotate-left"></i></div>
+    <button type="button" id="download-records-button" class="rt-btn rt-btn-download-records" onclick="openDownloadRecordsModal()" title="下载记录" aria-label="下载记录">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <span class="rt-download-records-dot" aria-hidden="true"></span>
+    </button>
     <div class="rt-btn" onclick="openPlaybackHistoryModal()" title="播放历史"><i class="fa-solid fa-clock"></i></div>
 
     {{ if or (gt .TotalPages 1) (eq .SearchType "local_music") }}
@@ -71,11 +65,24 @@
 
 <script>
     window.API_ROOT = "{{.Root}}";
+    window.sakanaInstance = null;
+
+    function initSakanaWidget() {
+        if (window.innerWidth > 768) {
+            window.sakanaInstance = new SakanaWidget().mount('#sakana-widget');
+        }
+    }
 </script>
 
 <script src="{{.Root}}/app.js"></script>
 {{template "videogen_modal" .}}
 <script src="{{.Root}}/videogen.js"></script>
+
+<div id="sakana-container" class="sakana-container">
+    <div id="sakana-widget"></div>
+</div>
+
+<script async onload="initSakanaWidget()" src="https://cdn.jsdelivr.net/npm/sakana-widget@2.7.1/lib/sakana.min.js"></script>
 
 </body>
 </html>

@@ -21,7 +21,7 @@ const (
 	DefaultWebPageSize              = 200
 	DefaultCLIPageSize              = 20
 	DefaultWebConcurrency           = 3
-	DefaultUpdateRepoURL            = "https://github.com/twamix/LuMusic"
+	DefaultUpdateRepoURL            = "https://github.com/guohuiyuan/go-music-dl"
 	DefaultGithubProxyURL           = "https://edgeone.gh-proxy.com"
 	webSettingsKey                  = "web_settings"
 	webAuthSettingsKey              = "web_auth_settings"
@@ -171,7 +171,7 @@ func defaultWebSettings() WebSettings {
 		DownloadConcurrency:      DefaultWebConcurrency,
 		AutoCheckUpdate:          true,
 		AutoSwitchInvalidSources: true,
-		AutoCacheOnPlay:          true,
+		AutoCacheOnPlay:          false,
 		UpdateRepoURL:            DefaultUpdateRepoURL,
 		GithubProxyEnabled:       false,
 		GithubProxyURL:           DefaultGithubProxyURL,
@@ -281,19 +281,19 @@ func SaveWebSettings(settings WebSettings) error {
 func GetWebAuthSettings() (WebAuthSettings, error) {
 	settings := defaultWebAuthSettings()
 	if err := ensureConfigDB(); err != nil {
-		return settings, nil
+		return settings, err
 	}
 
 	var row configKV
 	if err := configDB.Where("key = ?", webAuthSettingsKey).Limit(1).Find(&row).Error; err != nil {
-		return settings, nil
+		return settings, err
 	}
 	if row.Key == "" {
 		return settings, nil
 	}
 
 	if err := json.Unmarshal([]byte(row.Value), &settings); err != nil {
-		return defaultWebAuthSettings(), nil
+		return defaultWebAuthSettings(), err
 	}
 	return normalizeWebAuthSettings(settings), nil
 }
