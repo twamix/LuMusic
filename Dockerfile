@@ -12,7 +12,6 @@ COPY cmd ./cmd
 COPY core ./core
 COPY internal/cli ./internal/cli
 COPY internal/web ./internal/web
-COPY LICENSE README.md ./
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=${TARGETARCH:-$(go env GOARCH)} go build -o music-dl ./cmd/music-dl
 
 # Runtime stage
