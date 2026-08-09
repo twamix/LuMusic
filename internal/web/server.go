@@ -380,9 +380,7 @@ func StartWithOptions(port string, opts StartOptions) {
 	))
 	r.SetHTMLTemplate(tmpl)
 
-	r.GET("/", func(c *gin.Context) {
-		c.Redirect(http.StatusMovedPermanently, RoutePrefix)
-	})
+	r.GET("/", renderRootIndex)
 
 	videoDir := "data/video_output"
 	os.MkdirAll(videoDir, 0755)
@@ -415,12 +413,8 @@ func StartWithOptions(port string, opts StartOptions) {
 	}
 }
 
-func rootIndexHandlers(opts StartOptions) []gin.HandlerFunc {
-	handlers := make([]gin.HandlerFunc, 0, 1)
-	handlers = append(handlers, func(c *gin.Context) {
-		renderIndex(c, nil, nil, "", nil, "", "song", "", "", "", false, "", nil)
-	})
-	return handlers
+func renderRootIndex(c *gin.Context) {
+	renderIndex(c, nil, nil, "", nil, "", "song", "", "", "", false, "", nil)
 }
 
 func registerWebRoutes(api *gin.RouterGroup, opts StartOptions, videoDir string) {

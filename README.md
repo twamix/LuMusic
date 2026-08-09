@@ -9,7 +9,7 @@ mkdir -p data
 docker compose up -d
 ```
 
-启动后访问 <http://localhost:8080/music>。
+启动后访问 <http://localhost:8080/>。旧地址 <http://localhost:8080/music> 仍然兼容。
 
 默认 Compose 配置使用 `ghcr.io/twamix/lumusic:latest`，并把当前目录的 `data/` 挂载到容器 `/home/appuser/data`，用于保存下载文件、曲库索引、设置和登录信息。
 

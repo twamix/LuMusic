@@ -1244,7 +1244,6 @@ body.vg-open .aplayer.aplayer-fixed {
 /* 返回顶部按钮 */
 
 
-/* 🌟 Sakana 蒜苗看板娘容器控制 - 移到右侧 */
 
     background: #10b981;
     color: white;
@@ -1273,23 +1272,6 @@ body.vg-open .aplayer.aplayer-fixed {
     transition: background 0.2s, transform 0.15s;
 }
 
-/* 🌟 Sakana 蒜苗看板娘 - 左下角 */
-.sakana-container {
-    position: fixed;
-    bottom: 90px;
-    right: 14px;
-    z-index: 998;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    transform-origin: left bottom;
-    transform: scale(0.85);
-}
-
-/* 手机端隐藏 */
-@media (max-width: 768px) {
-    .sakana-container { display: none !important; }
-}
 
 .aplayer.aplayer-fixed .playmode-toggle-btn:hover,
 .aplayer.aplayer-fixed .playmode-toggle-btn:focus-visible {
