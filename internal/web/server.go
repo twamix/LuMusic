@@ -22,7 +22,10 @@ import (
 //go:embed templates/*
 var templateFS embed.FS
 
-const RoutePrefix = "/music"
+// DefaultRoutePrefix is the web UI base path used when no base path is configured.
+const DefaultRoutePrefix = "/music"
+
+var RoutePrefix = DefaultRoutePrefix
 
 type importCollectionMeta struct {
 	Enabled     bool
@@ -100,6 +103,12 @@ func setDownloadHeader(c *gin.Context, filename string) {
 	encoded := url.PathEscape(filename)
 	fallback := asciiDownloadFilenameFallback(filename)
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"; filename*=UTF-8''%s", fallback, encoded))
+}
+
+func publicWebSettings() core.WebSettings {
+	settings := core.GetWebSettings()
+	settings.WebDAVPassword = ""
+	return settings
 }
 
 func asciiDownloadFilenameFallback(filename string) string {
@@ -331,17 +340,31 @@ func renderIndex(c *gin.Context, songs []model.Song, playlists []model.Playlist,
 	})
 }
 
+func NormalizeBasePath(p string) string {
+	p = strings.TrimSpace(p)
+	p = strings.TrimRight(p, "/")
+	if p == "" {
+		return DefaultRoutePrefix
+	}
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	return p
+}
+
 type StartOptions struct {
 	ShouldOpenBrowser bool
 	DisableAuth       bool
 	ListenHost        string
+	BasePath          string
 }
 
-func Start(port string, shouldOpenBrowser bool) {
-	StartWithOptions(port, StartOptions{ShouldOpenBrowser: shouldOpenBrowser})
+func Start(port string, shouldOpenBrowser bool, basePath string) {
+	StartWithOptions(port, StartOptions{ShouldOpenBrowser: shouldOpenBrowser, BasePath: basePath})
 }
 
 func StartWithOptions(port string, opts StartOptions) {
+	RoutePrefix = NormalizeBasePath(opts.BasePath)
 	core.CM.Load()
 	if !opts.DisableAuth {
 		settings, err := core.GetWebAuthSettings()
@@ -455,7 +478,7 @@ func registerWebRoutes(api *gin.RouterGroup, opts StartOptions, videoDir string)
 	})
 
 	api.GET("/settings", func(c *gin.Context) {
-		c.JSON(200, core.GetWebSettings())
+		c.JSON(200, publicWebSettings())
 	})
 	configAPI.POST("/settings", func(c *gin.Context) {
 		var req core.WebSettings
@@ -467,7 +490,7 @@ func registerWebRoutes(api *gin.RouterGroup, opts StartOptions, videoDir string)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(200, core.GetWebSettings())
+		c.JSON(200, publicWebSettings())
 	})
 
 	RegisterMusicRoutes(api, configAPI)
