@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/guohuiyuan/music-lib/migu"
 	"github.com/guohuiyuan/music-lib/model"
 	"github.com/guohuiyuan/music-lib/soda"
 	"github.com/guohuiyuan/music-lib/utils"
@@ -116,11 +117,7 @@ func saveDownloadedSongToFile(result *DownloadedSong, outDir string) (*Downloade
 		return nil, errors.New("download result is nil")
 	}
 
-	targetDir := strings.TrimSpace(outDir)
-	if targetDir == "" {
-		targetDir = DefaultWebDownloadDir
-	}
-	targetDir = filepath.Clean(targetDir)
+	targetDir := DownloadDirOrDefault(outDir)
 
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return nil, err
@@ -230,7 +227,7 @@ func sanitizeDownloadPathSegment(value string) string {
 // FetchDecryptedSodaAudio 下载并解密 soda（汽水）加密音频流，返回明文音频字节。
 func FetchDecryptedSodaAudio(song *model.Song) ([]byte, error) {
 	cookie := CM.Get("soda")
-	sodaInst := soda.New(cookie)
+	sodaInst := NewSodaClient(cookie)
 	info, err := sodaInst.GetDownloadInfo(song)
 	if err != nil {
 		return nil, err
@@ -248,9 +245,40 @@ func FetchDecryptedSodaAudio(song *model.Song) ([]byte, error) {
 	return soda.DecryptAudio(encryptedData, info.PlayAuth)
 }
 
+// FetchDecryptedMiguAudio downloads a Migu stream and decrypts Z3D output.
+func FetchDecryptedMiguAudio(song *model.Song) ([]byte, error) {
+	miguInst := migu.New(CM.Get("migu"))
+	info, err := miguInst.GetDownloadInfo(song)
+	if err != nil {
+		return nil, err
+	}
+	return fetchMiguAudio(info)
+}
+
+func fetchMiguAudio(info *migu.DownloadInfo) ([]byte, error) {
+	if info == nil {
+		return nil, errors.New("migu download info is nil")
+	}
+	fileData, _, err := FetchBytesWithMime(info.URL, "migu")
+	if err != nil {
+		return nil, err
+	}
+	if !info.Encrypted {
+		return fileData, nil
+	}
+	return migu.DecryptAudio(fileData, info.FileKey)
+}
+
 func fetchSongAudio(song *model.Song) ([]byte, string, error) {
 	if song.Source == "soda" {
 		finalData, err := FetchDecryptedSodaAudio(song)
+		if err != nil {
+			return nil, "", err
+		}
+		return finalData, "", nil
+	}
+	if song.Source == "migu" {
+		finalData, err := FetchDecryptedMiguAudio(song)
 		if err != nil {
 			return nil, "", err
 		}

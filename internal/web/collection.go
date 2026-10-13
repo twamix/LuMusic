@@ -207,6 +207,8 @@ func CloseDB() {
 			sqlDB.Close()
 		}
 	}
+	db = nil
+	_ = core.CloseConfigDB()
 }
 
 func legacyFavoritesDBPath() string {

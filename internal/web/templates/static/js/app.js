@@ -13,6 +13,7 @@ const DOWNLOAD_DIR_PRESET_VALUES = [
   "data/downloads",
   "downloads",
   "D:/Music/Downloads",
+  "/home/appuser/data",
   "/sdcard/Music",
   "/storage/emulated/0/Music",
   "/sdcard/Download",
@@ -20,7 +21,7 @@ const DOWNLOAD_DIR_PRESET_VALUES = [
 const DOWNLOAD_DIR_PRESETS = new Set(DOWNLOAD_DIR_PRESET_VALUES);
 const DEFAULT_UPDATE_REPO_URL = "https://github.com/twamix/LuMusic";
 const DEFAULT_GITHUB_PROXY_URL = "https://edgeone.gh-proxy.com";
-const BATCH_DOWNLOAD_NOTICE_MS = 4200;
+const DEFAULT_DOWNLOAD_TIP_DURATION = 8;
 const OPEN_CONFIG_QUERY = "open_config";
 const GITHUB_PROXY_PRESETS = [
   "https://edgeone.gh-proxy.com",
@@ -39,6 +40,7 @@ let webSettings = {
   downloadToLocal: true,
   downloadDir: "data/downloads",
   downloadFilenameTemplate: "{name} - {artist}",
+  downloadTipDuration: DEFAULT_DOWNLOAD_TIP_DURATION,
   webdavEnabled: false,
   webdavUrl: "",
   webdavUsername: "",
@@ -53,6 +55,9 @@ let webSettings = {
   updateRepoUrl: DEFAULT_UPDATE_REPO_URL,
   githubProxyEnabled: false,
   githubProxyUrl: DEFAULT_GITHUB_PROXY_URL,
+  sodaSignerUrl: "",
+  sodaSignerToken: "",
+  sodaLocalSignerAvailable: false,
   vgChangeCover: false,
   vgChangeAudio: false,
   vgChangeLyric: false,
@@ -65,6 +70,7 @@ function normalizeWebSettings(raw) {
     downloadToLocal: true,
     downloadDir: "data/downloads",
     downloadFilenameTemplate: "{name} - {artist}",
+    downloadTipDuration: DEFAULT_DOWNLOAD_TIP_DURATION,
     webdavEnabled: false,
     webdavUrl: "",
     webdavUsername: "",
@@ -79,6 +85,9 @@ function normalizeWebSettings(raw) {
     updateRepoUrl: DEFAULT_UPDATE_REPO_URL,
     githubProxyEnabled: false,
     githubProxyUrl: DEFAULT_GITHUB_PROXY_URL,
+    sodaSignerUrl: "",
+    sodaSignerToken: "",
+    sodaLocalSignerAvailable: false,
     vgChangeCover: false,
     vgChangeAudio: false,
     vgChangeLyric: false,
@@ -100,6 +109,12 @@ function normalizeWebSettings(raw) {
     raw.downloadFilenameTemplate.trim() !== ""
   ) {
     next.downloadFilenameTemplate = raw.downloadFilenameTemplate.trim();
+  }
+  if (
+    Number.isInteger(raw.downloadTipDuration) &&
+    raw.downloadTipDuration > 0
+  ) {
+    next.downloadTipDuration = Math.min(raw.downloadTipDuration, 60);
   }
   if (typeof raw.webdavEnabled === "boolean") {
     next.webdavEnabled = raw.webdavEnabled;
@@ -152,6 +167,15 @@ function normalizeWebSettings(raw) {
   ) {
     next.githubProxyUrl = raw.githubProxyUrl.trim();
   }
+  if (typeof raw.sodaSignerUrl === "string") {
+    next.sodaSignerUrl = raw.sodaSignerUrl.trim();
+  }
+  if (typeof raw.sodaSignerToken === "string") {
+    next.sodaSignerToken = raw.sodaSignerToken;
+  }
+  if (typeof raw.sodaLocalSignerAvailable === "boolean") {
+    next.sodaLocalSignerAvailable = raw.sodaLocalSignerAvailable;
+  }
   if (typeof raw.vgChangeCover === "boolean") {
     next.vgChangeCover = raw.vgChangeCover;
   }
@@ -180,6 +204,50 @@ function persistWebSettingsCache() {
   try {
     localStorage.setItem(WEB_SETTINGS_KEY, JSON.stringify(webSettings));
   } catch (_) {}
+}
+
+let activeSettingsTab = "general";
+
+function setSettingsTab(tabName) {
+  const tabs = Array.from(document.querySelectorAll("[data-settings-tab]"));
+  const panels = Array.from(document.querySelectorAll("[data-settings-panel]"));
+  if (!tabs.length || !panels.length) return;
+
+  const requested = String(tabName || "").trim();
+  const target = panels.some((panel) => panel.dataset.settingsPanel === requested)
+    ? requested
+    : "general";
+  activeSettingsTab = target;
+
+  tabs.forEach((tab) => {
+    const active = tab.dataset.settingsTab === target;
+    tab.classList.toggle("is-active", active);
+    tab.setAttribute("aria-selected", String(active));
+    tab.tabIndex = active ? 0 : -1;
+  });
+  panels.forEach((panel) => {
+    panel.hidden = panel.dataset.settingsPanel !== target;
+  });
+}
+
+function bindSettingsTabs() {
+  const tabs = Array.from(document.querySelectorAll("[data-settings-tab]"));
+  if (!tabs.length) return;
+
+  tabs.forEach((tab, index) => {
+    if (tab.dataset.bound === "1") return;
+    tab.dataset.bound = "1";
+    tab.addEventListener("click", () => setSettingsTab(tab.dataset.settingsTab));
+    tab.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      event.preventDefault();
+      const offset = event.key === "ArrowRight" ? 1 : -1;
+      const next = tabs[(index + offset + tabs.length) % tabs.length];
+      next.focus();
+      setSettingsTab(next.dataset.settingsTab);
+    });
+  });
+  setSettingsTab(activeSettingsTab);
 }
 
 function applyVideoGenFeatureVisibility() {
@@ -321,6 +389,24 @@ function applyWebSettings(settings) {
   if (webdavDirInput) {
     webdavDirInput.value = webSettings.webdavDir;
   }
+  const sodaSignerUrlInput = document.getElementById("setting-soda-signer-url");
+  if (sodaSignerUrlInput) {
+    sodaSignerUrlInput.value = webSettings.sodaSignerUrl;
+  }
+  const sodaSignerTokenInput = document.getElementById(
+    "setting-soda-signer-token",
+  );
+  if (sodaSignerTokenInput) {
+    sodaSignerTokenInput.value = "";
+  }
+  const sodaLocalSignerState = document.getElementById(
+    "setting-soda-local-signer-state",
+  );
+  if (sodaLocalSignerState) {
+    sodaLocalSignerState.textContent = webSettings.sodaLocalSignerAvailable
+      ? "已检测到本机签名器：留空地址即可用。"
+      : "未检测到本机签名器：请安装汽水官方客户端（或 Node.js），或填写下面的远程签名服务地址。";
+  }
   bindWebDAVSettingEvents();
   syncWebDAVVisibility();
 
@@ -336,6 +422,13 @@ function applyWebSettings(settings) {
   );
   if (filenameTemplateInput) {
     filenameTemplateInput.value = webSettings.downloadFilenameTemplate;
+  }
+
+  const downloadTipDurationInput = document.getElementById(
+    "setting-download-tip-duration",
+  );
+  if (downloadTipDurationInput) {
+    downloadTipDurationInput.value = String(webSettings.downloadTipDuration);
   }
 
   const floatingLyricsToggle = document.getElementById(
@@ -738,6 +831,13 @@ function buildBatchFailureMessage(failures, title) {
   return message;
 }
 
+function downloadNoticeDuration() {
+  const seconds = Number(webSettings.downloadTipDuration);
+  return (Number.isFinite(seconds) && seconds > 0
+    ? Math.min(seconds, 60)
+    : DEFAULT_DOWNLOAD_TIP_DURATION) * 1000;
+}
+
 function showToast(title, message = "", type = "info", duration = 0) {
   let container = document.getElementById("app-toast-container");
   if (!container) {
@@ -870,10 +970,20 @@ async function handleDownloadClick(link) {
       message += `\nWebDAV: ${data.webdav_error}`;
       warning = true;
     }
-    showToast("下载完成", message, warning ? "warning" : "success", 0);
+    showToast(
+      "下载完成",
+      message,
+      warning ? "warning" : "success",
+      downloadNoticeDuration(),
+    );
     return true;
   } catch (error) {
-    showToast("下载失败", error.message || "下载失败", "error", 0);
+    showToast(
+      "下载失败",
+      error.message || "下载失败",
+      "error",
+      downloadNoticeDuration(),
+    );
   } finally {
     link.style.pointerEvents = "";
     link.style.opacity = "";
@@ -968,16 +1078,6 @@ function bindSearchForm(root = document) {
   if (!searchForm) return;
 
   searchForm.onsubmit = (event) => {
-    // Android 系统 WebView 下保留原生表单提交，让 WebView 直接用 GET
-    // 导航到搜索接口，由服务端整页渲染结果，避免 SPA DOM 替换导致结果为空。
-    if (/Android/i.test(navigator.userAgent)) {
-      const pageInput = searchForm.querySelector('input[name="page"]');
-      if (pageInput) {
-        pageInput.value = "1";
-      }
-      return;
-    }
-
     event.preventDefault();
 
     const pageInput = searchForm.querySelector('input[name="page"]');
@@ -992,7 +1092,7 @@ function bindSearchForm(root = document) {
     });
     targetURL.search = params.toString();
 
-    navigateTo(targetURL.toString());
+    navigateTo(targetURL.toString(), { scrollToResults: true });
   };
 }
 
@@ -1310,6 +1410,40 @@ function syncRightToolbar(nextDoc, currentContainer) {
   refreshAuthFloat();
 }
 
+// 结果区顶部至少要有这么多像素可见，才认为用户已经能看到搜索结果。
+const MIN_VISIBLE_RESULTS_PX = 120;
+
+// 小屏（安卓 WebView）首屏几乎被搜索框与搜索源面板占满，搜索后若仍停在页面
+// 顶部，结果列表会落在首屏之外，用户会误以为"搜索为空"。这里把结果区（无结果
+// 时为空状态提示）滚到视口顶部。结果区已有足够高度可见时不滚动，避免桌面端
+// 无谓跳动。只在搜索提交时调用，分页/播放列表等内部导航保持原行为。
+function scrollToSearchResults() {
+  const target =
+    document.querySelector(".list-header") ||
+    document.querySelector(".no-results");
+  if (!target) {
+    return;
+  }
+
+  const rect = target.getBoundingClientRect();
+  if (rect.top >= 0 && window.innerHeight - rect.top >= MIN_VISIBLE_RESULTS_PX) {
+    return;
+  }
+
+  window.scrollTo({
+    top: Math.max(rect.top + window.scrollY - 12, 0),
+    behavior: "auto",
+  });
+}
+
+function navigateBack() {
+  if (window.history.length > 1) {
+    window.history.back();
+    return;
+  }
+  void navigateTo(API_ROOT + "/");
+}
+
 async function navigateTo(url, options = {}) {
   let targetURL;
   try {
@@ -1322,14 +1456,6 @@ async function navigateTo(url, options = {}) {
     targetURL.origin !== window.location.origin ||
     !isAppRoute(targetURL.pathname)
   ) {
-    window.location.href = targetURL.toString();
-    return false;
-  }
-
-  // Android 系统 WebView 对 fetch + DOMParser 的整段 DOM 替换不够稳定，
-  // 搜索等内部路由在 SPA 替换后容易出现空白页。这里让安卓端统一走
-  // 原生整页导航，由服务端直接渲染结果，保证页面内容始终可见。
-  if (/Android/i.test(navigator.userAgent)) {
     window.location.href = targetURL.toString();
     return false;
   }
@@ -1389,7 +1515,9 @@ async function navigateTo(url, options = {}) {
     initializePageContent(currentContainer);
     updateFloatPageNav();
 
-    if (options.scroll !== false) {
+    if (options.scrollToResults) {
+      scrollToSearchResults();
+    } else if (options.scroll !== false) {
       window.scrollTo({ top: 0, behavior: "auto" });
     }
 
@@ -1398,6 +1526,15 @@ async function navigateTo(url, options = {}) {
     if (error && error.name === "AbortError") {
       return false;
     }
+    // WebView 可能不把 console 输出到 logcat，SPA 回退时把错误经桥接回传，
+    // 便于在壳层日志里定位是哪一步在安卓端失败。
+    try {
+      if (globalThis.callback && typeof globalThis.callback.musicDlAppState === "function") {
+        globalThis.callback.musicDlAppState(
+          "spa_error:" + (error && error.message ? error.message : String(error))
+        );
+      }
+    } catch (_) {}
     window.location.href = targetURL.toString();
     return false;
   } finally {
@@ -1562,12 +1699,18 @@ function bindPageNavigationEvents() {
 document.addEventListener("DOMContentLoaded", function () {
   loadWebSettingsFromCache();
   applyWebSettings(webSettings);
+  bindSettingsTabs();
   bindAuthFloat();
   refreshAuthFloat();
   fetchWebSettings().finally(() => maybeAutoCheckUpdate());
   bindPageNavigationEvents();
   initializePageContent(document);
   updateFloatPageNav();
+  // 直接打开搜索结果链接，或 SPA 失败回退到整页加载时，同样把结果滚入视口。
+  // 仅在 URL 带搜索词时触发，普通页面加载不受影响。
+  if (new URLSearchParams(window.location.search).get("q")) {
+    scrollToSearchResults();
+  }
   if (
     new URLSearchParams(window.location.search).get(OPEN_CONFIG_QUERY) === "1"
   ) {
@@ -1722,6 +1865,25 @@ function goToUserPlaylists() {
     navigateTo(
       API_ROOT +
         "/user_playlists?sources=" +
+        selected.map(encodeURIComponent).join("&sources="),
+    );
+  }
+}
+
+function goToTopLists() {
+  const selected = [];
+  document.querySelectorAll(".source-checkbox:checked").forEach((cb) => {
+    if (cb.dataset.toplistSupported === "true") {
+      selected.push(cb.value);
+    }
+  });
+
+  if (selected.length === 0) {
+    navigateTo(API_ROOT + "/toplists");
+  } else {
+    navigateTo(
+      API_ROOT +
+        "/toplists?sources=" +
         selected.map(encodeURIComponent).join("&sources="),
     );
   }
@@ -3815,6 +3977,7 @@ async function openSystemConfig() {
       const el = document.getElementById(`cookie-${k}`);
       if (el) el.value = v;
     }
+    bindSettingsTabs();
     setAuthFloatLoggedIn(true);
     if (modal) modal.style.display = "flex";
   } catch (error) {
@@ -3837,6 +4000,10 @@ async function saveCookies() {
     downloadFilenameTemplate:
       document.getElementById("setting-download-filename-template")?.value ||
       "",
+    downloadTipDuration: parsePositiveInt(
+      document.getElementById("setting-download-tip-duration")?.value,
+      DEFAULT_DOWNLOAD_TIP_DURATION,
+    ),
     webdavEnabled: !!document.getElementById("setting-webdav-enabled")
       ?.checked,
     webdavUrl: document.getElementById("setting-webdav-url")?.value || "",
@@ -3864,6 +4031,10 @@ async function saveCookies() {
     updateRepoUrl: webSettings.updateRepoUrl || DEFAULT_UPDATE_REPO_URL,
     githubProxyEnabled: !!webSettings.githubProxyEnabled,
     githubProxyUrl: webSettings.githubProxyUrl || DEFAULT_GITHUB_PROXY_URL,
+    sodaSignerUrl:
+      document.getElementById("setting-soda-signer-url")?.value || "",
+    sodaSignerToken:
+      document.getElementById("setting-soda-signer-token")?.value || "",
     vgChangeCover: !!document.getElementById("setting-vg-change-cover")
       ?.checked,
     vgChangeAudio: !!document.getElementById("setting-vg-change-audio")
@@ -5300,6 +5471,8 @@ function setPlayButtonState(card, isPlaying) {
   icon.classList.remove("fa-play", "fa-stop");
   icon.classList.add(isPlaying ? "fa-stop" : "fa-play");
   btn.title = isPlaying ? "停止" : "播放";
+  btn.setAttribute("aria-label", isPlaying ? "停止" : "播放");
+  btn.classList.toggle("is-stop", isPlaying);
 }
 
 function syncAllPlayButtons() {
@@ -6215,7 +6388,7 @@ async function batchCopyDownloadUrls() {
       "下载地址已复制",
       `${scope}歌曲的下载链接已写入剪贴板，可直接粘贴到 aria2。`,
       "success",
-      BATCH_DOWNLOAD_NOTICE_MS,
+      downloadNoticeDuration(),
     );
   } catch (err) {
     showToast(
@@ -6258,7 +6431,7 @@ async function batchDownload() {
     "批量下载已开始",
     `正在保存 ${songs.length} 首歌曲${ignoredLocalText}，进度与结果请查看右侧“下载记录”。`,
     "info",
-    BATCH_DOWNLOAD_NOTICE_MS,
+    downloadNoticeDuration(),
   );
 
   let success = 0;
@@ -6296,7 +6469,7 @@ async function batchDownload() {
       failed > 0 ? "批量下载部分完成" : "批量下载完成",
       `${summary.join("，")}。详情请查看右侧“下载记录”。`,
       failed > 0 ? "warning" : "success",
-      BATCH_DOWNLOAD_NOTICE_MS,
+      downloadNoticeDuration(),
     );
 
     setDownloadRecordsButtonState("updated");

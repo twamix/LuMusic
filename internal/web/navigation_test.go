@@ -67,6 +67,9 @@ func TestRenderIndexPlaylistCardsUseAjaxNavigation(t *testing.T) {
 	if !strings.Contains(body, `onclick="navigateTo('`) {
 		t.Fatalf("rendered html missing navigateTo playlist navigation: %s", body)
 	}
+	if strings.Contains(body, `class="detail-back-row"`) {
+		t.Fatalf("playlist search results should not render the detail back button: %s", body)
+	}
 }
 
 func TestRemotePlaylistDetailKeepsGlobalRightToolbar(t *testing.T) {
@@ -94,6 +97,30 @@ func TestRemotePlaylistDetailKeepsGlobalRightToolbar(t *testing.T) {
 	}
 	if !strings.Contains(body, `onclick="openPlaybackHistoryModal()"`) {
 		t.Fatalf("remote playlist detail should retain playback history access: %s", body)
+	}
+	if !strings.Contains(body, `class="detail-back-row"`) ||
+		!strings.Contains(body, `onclick="navigateBack()"`) {
+		t.Fatalf("remote playlist detail should render a back button: %s", body)
+	}
+}
+
+func TestDetailPagePathDetection(t *testing.T) {
+	for _, requestPath := range []string{
+		"/playlist",
+		"/music/playlist/",
+		"/album",
+		"/music/album/",
+		"/collection",
+		"/music/collection/",
+	} {
+		if !isDetailPagePath(requestPath) {
+			t.Fatalf("isDetailPagePath(%q) = false, want true", requestPath)
+		}
+	}
+	for _, requestPath := range []string{"/", "/search", "/playlist_categories", "/toplists", "/toplist_songs", "/my_collections", "/local_music_page"} {
+		if isDetailPagePath(requestPath) {
+			t.Fatalf("isDetailPagePath(%q) = true, want false", requestPath)
+		}
 	}
 }
 
@@ -140,6 +167,9 @@ func TestAppJSIncludesAjaxNavigationEntryPoints(t *testing.T) {
 	js := string(content)
 	if !strings.Contains(js, "async function navigateTo(url, options = {})") {
 		t.Fatal("app.js missing navigateTo function")
+	}
+	if !strings.Contains(js, "function navigateBack()") {
+		t.Fatal("app.js missing navigateBack function")
 	}
 	if !strings.Contains(js, "function bindPageNavigationEvents()") {
 		t.Fatal("app.js missing bindPageNavigationEvents function")
