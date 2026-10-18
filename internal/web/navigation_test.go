@@ -437,6 +437,7 @@ func TestSettingsModalIncludesDownloadDirPresets(t *testing.T) {
 		`id="setting-auto-cache-on-play"`,
 		`id="setting-floating-lyrics"`,
 		`id="setting-auto-switch-invalid-sources"`,
+		`id="setting-soda-client-dir"`,
 		`class="cookie-item setting-item setting-link-row"`,
 		`setting-link-icon`,
 		`setting-link-title`,

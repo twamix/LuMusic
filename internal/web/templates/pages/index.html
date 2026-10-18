@@ -10,8 +10,8 @@
     <link rel="stylesheet" href="{{.Root}}/style.css">
     <link rel="stylesheet" href="{{.Root}}/videogen.css">
     
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aplayer/dist/APlayer.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css">
+    <link rel="stylesheet" href="{{.Root}}/vendor/aplayer/APlayer.min.css">
+    <link rel="stylesheet" href="{{.Root}}/vendor/fontawesome/css/all.min.css">
 </head>
 <body>
 
@@ -42,7 +42,7 @@
 
     <!-- 滚动按钮组 -->
     <div class="rt-btn" onclick="scrollToTop()" title="回到顶部"><i class="fa-solid fa-arrow-up"></i></div>
-    <div class="rt-btn" onclick="scrollToBottom()" title="回到底部"><i class="fa-solid fa-arrow-down"></i></div>
+    <div id="locate-current-track" class="rt-btn" onclick="scrollToCurrentPlaying()" title="定位当前播放歌曲" aria-label="定位当前播放歌曲" hidden><i class="fa-solid fa-headphones"></i></div>
 </div>
 
 <div class="container">
@@ -62,7 +62,7 @@
 {{template "modals" .}}
 
 <div id="aplayer"></div>
-<script src="https://cdn.jsdelivr.net/npm/aplayer/dist/APlayer.min.js"></script>
+<script src="{{.Root}}/vendor/aplayer/APlayer.min.js"></script>
 
 <script>
     window.API_ROOT = "{{.Root}}";

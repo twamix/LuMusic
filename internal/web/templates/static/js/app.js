@@ -29,6 +29,20 @@ const GITHUB_PROXY_PRESETS = [
   "https://gh-proxy.com/",
   "https://gh.llkk.cc",
 ];
+const DEFAULT_SHORTCUT_PLAY_PAUSE = "Space";
+const DEFAULT_LYRIC_FONT_FAMILY = "system";
+const DEFAULT_LYRIC_FONT_SIZE = 24;
+const LYRIC_FONT_FAMILIES = Object.freeze({
+  system:
+    '-apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif',
+  sans: '"Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif',
+  serif: '"Songti SC", SimSun, "Noto Serif CJK SC", serif',
+  yahei: '"Microsoft YaHei", "PingFang SC", sans-serif',
+  pingfang: '"PingFang SC", "Microsoft YaHei", sans-serif',
+  "source-han":
+    '"Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+  lxgw: '"LXGW WenKai", "KaiTi", "STKaiti", serif',
+});
 
 function isLocalMusicSourceValue(source) {
   const value = String(source || "").trim();
@@ -52,16 +66,28 @@ let webSettings = {
   autoCheckUpdate: true,
   autoSwitchInvalidSources: true,
   autoCacheOnPlay: false,
+  filterVersionKeywords: false,
+  versionFilterKeywords: "Live, Remix, Demo",
+  filterShortTracks: false,
+  normalizeChineseVariants: true,
   updateRepoUrl: DEFAULT_UPDATE_REPO_URL,
   githubProxyEnabled: false,
   githubProxyUrl: DEFAULT_GITHUB_PROXY_URL,
   sodaSignerUrl: "",
   sodaSignerToken: "",
+  sodaClientDir: "",
   sodaLocalSignerAvailable: false,
   vgChangeCover: false,
   vgChangeAudio: false,
   vgChangeLyric: false,
   vgExportVideo: false,
+  shortcutPlayPause: DEFAULT_SHORTCUT_PLAY_PAUSE,
+  shortcutPrevious: "",
+  shortcutNext: "",
+  shortcutSeekBack: "",
+  shortcutSeekForward: "",
+  lyricFontFamily: DEFAULT_LYRIC_FONT_FAMILY,
+  lyricFontSize: DEFAULT_LYRIC_FONT_SIZE,
 };
 
 function normalizeWebSettings(raw) {
@@ -82,16 +108,28 @@ function normalizeWebSettings(raw) {
     autoCheckUpdate: true,
     autoSwitchInvalidSources: true,
     autoCacheOnPlay: false,
+    filterVersionKeywords: false,
+    versionFilterKeywords: "Live, Remix, Demo",
+    filterShortTracks: false,
+    normalizeChineseVariants: true,
     updateRepoUrl: DEFAULT_UPDATE_REPO_URL,
     githubProxyEnabled: false,
     githubProxyUrl: DEFAULT_GITHUB_PROXY_URL,
     sodaSignerUrl: "",
     sodaSignerToken: "",
+    sodaClientDir: "",
     sodaLocalSignerAvailable: false,
     vgChangeCover: false,
     vgChangeAudio: false,
     vgChangeLyric: false,
     vgExportVideo: false,
+    shortcutPlayPause: DEFAULT_SHORTCUT_PLAY_PAUSE,
+    shortcutPrevious: "",
+    shortcutNext: "",
+    shortcutSeekBack: "",
+    shortcutSeekForward: "",
+    lyricFontFamily: DEFAULT_LYRIC_FONT_FAMILY,
+    lyricFontSize: DEFAULT_LYRIC_FONT_SIZE,
   };
 
   if (!raw || typeof raw !== "object") {
@@ -152,6 +190,19 @@ function normalizeWebSettings(raw) {
   if (typeof raw.autoCacheOnPlay === "boolean") {
     next.autoCacheOnPlay = raw.autoCacheOnPlay;
   }
+  if (typeof raw.filterVersionKeywords === "boolean") {
+    next.filterVersionKeywords = raw.filterVersionKeywords;
+  }
+  if (typeof raw.versionFilterKeywords === "string") {
+    next.versionFilterKeywords =
+      raw.versionFilterKeywords.trim() || "Live, Remix, Demo";
+  }
+  if (typeof raw.filterShortTracks === "boolean") {
+    next.filterShortTracks = raw.filterShortTracks;
+  }
+  if (typeof raw.normalizeChineseVariants === "boolean") {
+    next.normalizeChineseVariants = raw.normalizeChineseVariants;
+  }
   if (
     typeof raw.updateRepoUrl === "string" &&
     raw.updateRepoUrl.trim() !== ""
@@ -173,6 +224,9 @@ function normalizeWebSettings(raw) {
   if (typeof raw.sodaSignerToken === "string") {
     next.sodaSignerToken = raw.sodaSignerToken;
   }
+  if (typeof raw.sodaClientDir === "string") {
+    next.sodaClientDir = raw.sodaClientDir.trim();
+  }
   if (typeof raw.sodaLocalSignerAvailable === "boolean") {
     next.sodaLocalSignerAvailable = raw.sodaLocalSignerAvailable;
   }
@@ -187,6 +241,29 @@ function normalizeWebSettings(raw) {
   }
   if (typeof raw.vgExportVideo === "boolean") {
     next.vgExportVideo = raw.vgExportVideo;
+  }
+  [
+    "shortcutPlayPause",
+    "shortcutPrevious",
+    "shortcutNext",
+    "shortcutSeekBack",
+    "shortcutSeekForward",
+  ].forEach((key) => {
+    if (typeof raw[key] === "string") {
+      next[key] = normalizeShortcutBinding(raw[key]);
+    }
+  });
+  if (
+    typeof raw.lyricFontFamily === "string" &&
+    Object.prototype.hasOwnProperty.call(
+      LYRIC_FONT_FAMILIES,
+      raw.lyricFontFamily,
+    )
+  ) {
+    next.lyricFontFamily = raw.lyricFontFamily;
+  }
+  if (Number.isInteger(raw.lyricFontSize)) {
+    next.lyricFontSize = Math.max(14, Math.min(48, raw.lyricFontSize));
   }
   return next;
 }
@@ -272,6 +349,29 @@ function syncWebDAVVisibility() {
   }
 }
 
+function syncSearchFilterControls() {
+  const versionToggle = document.getElementById(
+    "setting-filter-version-keywords",
+  );
+  const keywordInput = document.getElementById(
+    "setting-version-filter-keywords",
+  );
+  if (keywordInput) {
+    keywordInput.disabled = !versionToggle?.checked;
+  }
+}
+
+function bindSearchFilterSettingEvents() {
+  const versionToggle = document.getElementById(
+    "setting-filter-version-keywords",
+  );
+  if (versionToggle && versionToggle.dataset.bound !== "1") {
+    versionToggle.dataset.bound = "1";
+    versionToggle.addEventListener("change", syncSearchFilterControls);
+  }
+  syncSearchFilterControls();
+}
+
 function bindWebDAVSettingEvents() {
   const toggle = document.getElementById("setting-webdav-enabled");
   if (!toggle || toggle.dataset.bound === "1") return;
@@ -352,6 +452,287 @@ function bindDownloadDirPresetEvents() {
   dirInput.addEventListener("input", syncDownloadDirPresetFromInput);
 }
 
+function normalizeShortcutKey(key) {
+  const value = String(key || "").trim();
+  if (!value) return "";
+
+  const aliases = {
+    space: "Space",
+    spacebar: "Space",
+    esc: "Escape",
+    escape: "Escape",
+    enter: "Enter",
+    return: "Enter",
+    tab: "Tab",
+    backspace: "Backspace",
+    delete: "Delete",
+    del: "Delete",
+    insert: "Insert",
+    ins: "Insert",
+    home: "Home",
+    end: "End",
+    pageup: "PageUp",
+    pgup: "PageUp",
+    pagedown: "PageDown",
+    pgdn: "PageDown",
+    arrowleft: "ArrowLeft",
+    left: "ArrowLeft",
+    arrowright: "ArrowRight",
+    right: "ArrowRight",
+    arrowup: "ArrowUp",
+    up: "ArrowUp",
+    arrowdown: "ArrowDown",
+    down: "ArrowDown",
+    mediaplaypause: "MediaPlayPause",
+    mediatracknext: "MediaTrackNext",
+    mediatrackprevious: "MediaTrackPrevious",
+    mediastop: "MediaStop",
+  };
+  const lower = value.toLowerCase();
+  if (aliases[lower]) return aliases[lower];
+
+  if (/^key[a-z]$/i.test(value)) return value.slice(3).toUpperCase();
+  if (/^digit[0-9]$/i.test(value)) return value.slice(5);
+  if (/^f([1-9]|1[0-9]|2[0-4])$/i.test(value)) {
+    return value.toUpperCase();
+  }
+  if (value.length === 1) return value.toUpperCase();
+  return value.length <= 32 ? value : "";
+}
+
+function normalizeShortcutBinding(binding) {
+  const raw = String(binding || "").trim();
+  if (!raw) return "";
+
+  const modifiers = new Set();
+  let key = "";
+  for (const part of raw.split("+")) {
+    const value = part.trim();
+    if (!value) return "";
+    const lower = value.toLowerCase();
+    if (lower === "ctrl" || lower === "control") {
+      modifiers.add("Ctrl");
+    } else if (lower === "alt" || lower === "option") {
+      modifiers.add("Alt");
+    } else if (lower === "shift") {
+      modifiers.add("Shift");
+    } else if (
+      ["meta", "cmd", "command", "win", "super"].includes(lower)
+    ) {
+      modifiers.add("Meta");
+    } else {
+      if (key) return "";
+      key = normalizeShortcutKey(value);
+      if (!key) return "";
+    }
+  }
+  if (!key) return "";
+
+  return [
+    ...["Ctrl", "Alt", "Shift", "Meta"].filter((modifier) =>
+      modifiers.has(modifier),
+    ),
+    key,
+  ].join("+");
+}
+
+function shortcutBindingFromKeyboardEvent(event) {
+  const ignoredKeys = new Set(["Control", "Shift", "Alt", "Meta"]);
+  if (ignoredKeys.has(event.key)) return "";
+
+  const key = normalizeShortcutKey(event.code || event.key);
+  if (!key || key === "Unidentified") return "";
+
+  const modifiers = [];
+  if (event.ctrlKey) modifiers.push("Ctrl");
+  if (event.altKey) modifiers.push("Alt");
+  if (event.shiftKey) modifiers.push("Shift");
+  if (event.metaKey) modifiers.push("Meta");
+  modifiers.push(key);
+  return normalizeShortcutBinding(modifiers.join("+"));
+}
+
+function shortcutUsesPaginationKey(binding) {
+  const parts = normalizeShortcutBinding(binding).split("+");
+  const key = parts[parts.length - 1];
+  return key === "PageUp" || key === "PageDown";
+}
+
+function normalizeLyricFontFamily(value) {
+  const family = String(value || "").trim();
+  return Object.prototype.hasOwnProperty.call(LYRIC_FONT_FAMILIES, family)
+    ? family
+    : DEFAULT_LYRIC_FONT_FAMILY;
+}
+
+function normalizeLyricFontSize(value) {
+  const size = Number.parseInt(value, 10);
+  if (!Number.isFinite(size)) return DEFAULT_LYRIC_FONT_SIZE;
+  return Math.max(14, Math.min(48, size));
+}
+
+function lyricFontCSSValue(family) {
+  return (
+    LYRIC_FONT_FAMILIES[normalizeLyricFontFamily(family)] ||
+    LYRIC_FONT_FAMILIES[DEFAULT_LYRIC_FONT_FAMILY]
+  );
+}
+
+function applyLyricAppearance() {
+  const family = lyricFontCSSValue(webSettings.lyricFontFamily);
+  const size = normalizeLyricFontSize(webSettings.lyricFontSize);
+  document.documentElement.style.setProperty("--lyric-font-family", family);
+  document.documentElement.style.setProperty("--lyric-font-size", `${size}px`);
+}
+
+function updateLyricFontPreview(family, size) {
+  const preview = document.getElementById("setting-lyric-font-preview");
+  if (!preview) return;
+  preview.style.fontFamily = lyricFontCSSValue(family);
+  preview.style.fontSize = `${normalizeLyricFontSize(size)}px`;
+}
+
+function syncLyricAppearanceControls() {
+  const familyInput = document.getElementById("setting-lyric-font-family");
+  const sizeInput = document.getElementById("setting-lyric-font-size");
+  const sizeValue = document.getElementById(
+    "setting-lyric-font-size-value",
+  );
+  const family = normalizeLyricFontFamily(webSettings.lyricFontFamily);
+  const size = normalizeLyricFontSize(webSettings.lyricFontSize);
+
+  if (familyInput) familyInput.value = family;
+  if (sizeInput) sizeInput.value = String(size);
+  if (sizeValue) sizeValue.textContent = `${size} px`;
+  updateLyricFontPreview(family, size);
+  applyLyricAppearance();
+}
+
+function bindLyricFontSettingEvents() {
+  const familyInput = document.getElementById("setting-lyric-font-family");
+  const sizeInput = document.getElementById("setting-lyric-font-size");
+  const sizeValue = document.getElementById(
+    "setting-lyric-font-size-value",
+  );
+  if (!familyInput || !sizeInput || sizeInput.dataset.bound === "1") return;
+
+  sizeInput.dataset.bound = "1";
+  const preview = () => {
+    const size = normalizeLyricFontSize(sizeInput.value);
+    if (sizeValue) sizeValue.textContent = `${size} px`;
+    updateLyricFontPreview(familyInput.value, size);
+  };
+  familyInput.addEventListener("change", preview);
+  sizeInput.addEventListener("input", preview);
+}
+
+const PLAYBACK_SHORTCUT_FIELDS = Object.freeze([
+  ["shortcutPlayPause", "setting-shortcut-play-pause", "播放 / 暂停"],
+  ["shortcutPrevious", "setting-shortcut-previous", "上一首"],
+  ["shortcutNext", "setting-shortcut-next", "下一首"],
+  ["shortcutSeekBack", "setting-shortcut-seek-back", "后退 10 秒"],
+  ["shortcutSeekForward", "setting-shortcut-seek-forward", "前进 10 秒"],
+]);
+
+function setShortcutCaptureStatus(message = "", isError = false) {
+  const status = document.getElementById("setting-shortcut-status");
+  if (!status) return;
+  status.textContent =
+    message ||
+    "点击输入框后按下组合键；Backspace / Delete 清空，Esc 取消。PageUp / PageDown 保留给列表翻页。";
+  status.classList.toggle("is-error", isError);
+}
+
+function handleShortcutCaptureKeydown(event) {
+  if (event.key === "Tab") return;
+  event.preventDefault();
+  event.stopPropagation();
+  const input = event.currentTarget;
+
+  if (event.key === "Escape") {
+    input.value = input.dataset.previousValue || "";
+    setShortcutCaptureStatus();
+    input.blur();
+    return;
+  }
+  if (
+    (event.key === "Backspace" || event.key === "Delete") &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.metaKey
+  ) {
+    input.value = "";
+    setShortcutCaptureStatus();
+    return;
+  }
+  if (["Control", "Shift", "Alt", "Meta"].includes(event.key)) return;
+
+  const binding = shortcutBindingFromKeyboardEvent(event);
+  if (!binding) return;
+  if (shortcutUsesPaginationKey(binding)) {
+    setShortcutCaptureStatus(
+      "PageUp / PageDown 已用于列表翻页，请换一个按键组合。",
+      true,
+    );
+    return;
+  }
+  input.value = binding;
+  setShortcutCaptureStatus(`已捕获：${binding}`);
+}
+
+function syncPlaybackShortcutControls() {
+  PLAYBACK_SHORTCUT_FIELDS.forEach(([key, elementId]) => {
+    const input = document.getElementById(elementId);
+    if (input) input.value = normalizeShortcutBinding(webSettings[key]);
+  });
+}
+
+function bindPlaybackShortcutSettingEvents() {
+  document.querySelectorAll("[data-shortcut-input]").forEach((input) => {
+    if (input.dataset.bound === "1") return;
+    input.dataset.bound = "1";
+    input.addEventListener("focus", () => {
+      input.dataset.previousValue = input.value;
+      setShortcutCaptureStatus("请按下新的快捷键组合…");
+    });
+    input.addEventListener("keydown", handleShortcutCaptureKeydown);
+    input.addEventListener("blur", () => setShortcutCaptureStatus());
+  });
+  document.querySelectorAll("[data-shortcut-clear]").forEach((button) => {
+    if (button.dataset.bound === "1") return;
+    button.dataset.bound = "1";
+    button.addEventListener("click", () => {
+      const input = document.getElementById(button.dataset.shortcutClear);
+      if (!input) return;
+      input.value = "";
+      setShortcutCaptureStatus();
+      input.focus();
+    });
+  });
+}
+
+function readPlaybackShortcutSettingsFromForm() {
+  const settings = {};
+  const seen = new Map();
+  for (const [key, elementId, label] of PLAYBACK_SHORTCUT_FIELDS) {
+    const input = document.getElementById(elementId);
+    const binding = normalizeShortcutBinding(input?.value || "");
+    if (input) input.value = binding;
+    settings[key] = binding;
+    if (!binding) continue;
+    if (shortcutUsesPaginationKey(binding)) {
+      throw new Error(`${label} 不能使用 PageUp / PageDown，该按键保留给列表翻页。`);
+    }
+    if (seen.has(binding)) {
+      throw new Error(
+        `快捷键冲突：${seen.get(binding)} 和 ${label} 都使用了 ${binding}。`,
+      );
+    }
+    seen.set(binding, label);
+  }
+  return settings;
+}
+
 function applyWebSettings(settings) {
   const wasAutoSwitchInvalidSourcesEnabled =
     isAutoSwitchInvalidSourcesEnabled();
@@ -399,6 +780,10 @@ function applyWebSettings(settings) {
   if (sodaSignerTokenInput) {
     sodaSignerTokenInput.value = "";
   }
+  const sodaClientDirInput = document.getElementById("setting-soda-client-dir");
+  if (sodaClientDirInput) {
+    sodaClientDirInput.value = webSettings.sodaClientDir;
+  }
   const sodaLocalSignerState = document.getElementById(
     "setting-soda-local-signer-state",
   );
@@ -437,6 +822,10 @@ function applyWebSettings(settings) {
   if (floatingLyricsToggle) {
     floatingLyricsToggle.checked = !webSettings.disableFloatingLyrics;
   }
+  bindLyricFontSettingEvents();
+  syncLyricAppearanceControls();
+  bindPlaybackShortcutSettingEvents();
+  syncPlaybackShortcutControls();
 
   const webPageSizeInput = document.getElementById("setting-web-page-size");
   if (webPageSizeInput) {
@@ -466,6 +855,33 @@ function applyWebSettings(settings) {
   if (autoCacheOnPlayToggle) {
     autoCacheOnPlayToggle.checked = webSettings.autoCacheOnPlay;
   }
+
+  const filterVersionToggle = document.getElementById(
+    "setting-filter-version-keywords",
+  );
+  if (filterVersionToggle) {
+    filterVersionToggle.checked = webSettings.filterVersionKeywords;
+  }
+  const versionFilterKeywordsInput = document.getElementById(
+    "setting-version-filter-keywords",
+  );
+  if (versionFilterKeywordsInput) {
+    versionFilterKeywordsInput.value = webSettings.versionFilterKeywords;
+  }
+  const filterShortTracksToggle = document.getElementById(
+    "setting-filter-short-tracks",
+  );
+  if (filterShortTracksToggle) {
+    filterShortTracksToggle.checked = webSettings.filterShortTracks;
+  }
+  const normalizeChineseVariantsToggle = document.getElementById(
+    "setting-normalize-chinese-variants",
+  );
+  if (normalizeChineseVariantsToggle) {
+    normalizeChineseVariantsToggle.checked =
+      webSettings.normalizeChineseVariants;
+  }
+  bindSearchFilterSettingEvents();
 
   const vgChangeCoverToggle = document.getElementById(
     "setting-vg-change-cover",
@@ -1077,8 +1493,21 @@ function bindSearchForm(root = document) {
   const searchForm = root.querySelector("#search-form");
   if (!searchForm) return;
 
-  searchForm.onsubmit = (event) => {
+  searchForm.onsubmit = async (event) => {
     event.preventDefault();
+    if (searchForm.dataset.loading === "1") return;
+
+    const submitButton = searchForm.querySelector(".search-btn");
+    const submitIcon = submitButton?.querySelector("i");
+    searchForm.dataset.loading = "1";
+    searchForm.setAttribute("aria-busy", "true");
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.title = "搜索中";
+    }
+    if (submitIcon) {
+      submitIcon.className = "fa-solid fa-spinner fa-spin";
+    }
 
     const pageInput = searchForm.querySelector('input[name="page"]');
     if (pageInput) {
@@ -1092,13 +1521,28 @@ function bindSearchForm(root = document) {
     });
     targetURL.search = params.toString();
 
-    navigateTo(targetURL.toString(), { scrollToResults: true });
+    try {
+      await navigateTo(targetURL.toString(), { scrollToResults: true });
+    } finally {
+      if (searchForm.isConnected) {
+        delete searchForm.dataset.loading;
+        searchForm.removeAttribute("aria-busy");
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.title = "搜索";
+        }
+        if (submitIcon) {
+          submitIcon.className = "fa-solid fa-magnifying-glass";
+        }
+      }
+    }
   };
 }
 
 function bindSongCardCovers(root = document) {
   const cards = root.querySelectorAll(".song-card");
   cards.forEach((card, index) => {
+    ensureSongActionFold(card);
     queueInspectSong(card, index * INSPECT_REQUEST_DELAY_MS);
 
     const coverWrap = card.querySelector(".cover-wrapper");
@@ -1128,6 +1572,54 @@ function bindSongCardCovers(root = document) {
       }
     };
   });
+}
+
+function ensureSongActionFold(card) {
+  const actions = card?.querySelector(".actions");
+  if (!actions) return;
+
+  let moreActions = actions.querySelector(".mobile-more-actions");
+  if (!moreActions) {
+    moreActions = document.createElement("div");
+    moreActions.className = "mobile-more-actions";
+    actions.appendChild(moreActions);
+  }
+
+  Array.from(actions.children).forEach((action) => {
+    if (action.classList.contains("btn-dl")) {
+      moreActions.appendChild(action);
+    }
+  });
+
+  let toggle = actions.querySelector(".mobile-more-toggle");
+  if (!toggle) {
+    toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "btn-circle mobile-more-toggle";
+    toggle.title = "更多下载操作";
+    toggle.setAttribute("aria-label", "更多下载操作");
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.innerHTML =
+      '<i class="fa-solid fa-ellipsis" aria-hidden="true"></i>';
+    toggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const expanded = !moreActions.classList.contains("is-open");
+      moreActions.classList.toggle("is-open", expanded);
+      toggle.setAttribute("aria-expanded", String(expanded));
+      toggle.classList.toggle("is-open", expanded);
+    });
+    actions.appendChild(toggle);
+  }
+
+  const hasDownloadActions = Boolean(
+    moreActions.querySelector(".btn-dl"),
+  );
+  toggle.hidden = !hasDownloadActions;
+  if (!hasDownloadActions) {
+    moreActions.classList.remove("is-open");
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.classList.remove("is-open");
+  }
 }
 
 // === 本地音乐匹配缓存 ===
@@ -1303,6 +1795,8 @@ function initializePageContent(root = document) {
   syncMediaSession();
   initializeLocalMusicPage(root);
   scheduleBatchLocalMusicMatch();
+  syncTVFocusableElements(root);
+  scheduleTVInitialFocus();
 }
 
 function setSongListToolsOpen(tools, isOpen) {
@@ -1631,9 +2125,6 @@ function togglePlayback() {
 
 function handlePlaybackShortcut(event) {
   if (event.defaultPrevented || event.isComposing) return;
-  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-  if (event.code !== "Space" && event.key !== " " && event.key !== "Spacebar")
-    return;
   if (
     isEditableElement(event.target) ||
     isEditableElement(document.activeElement)
@@ -1649,8 +2140,24 @@ function handlePlaybackShortcut(event) {
   )
     return;
 
+  const binding = shortcutBindingFromKeyboardEvent(event);
+  if (!binding) return;
+  const actions = [
+    [webSettings.shortcutPlayPause, togglePlayback],
+    [webSettings.shortcutPrevious, () => switchTrackByOffset(-1)],
+    [webSettings.shortcutNext, () => switchTrackByOffset(1)],
+    [webSettings.shortcutSeekBack, () => adjustCurrentTrackPosition(-10)],
+    [webSettings.shortcutSeekForward, () => adjustCurrentTrackPosition(10)],
+  ];
+  const action = actions.find(
+    ([shortcut]) =>
+      shortcut && normalizeShortcutBinding(shortcut) === binding,
+  );
+  if (!action) return;
+
   event.preventDefault();
-  togglePlayback();
+  if (event.repeat && action[0] === webSettings.shortcutPlayPause) return;
+  action[1]();
 }
 
 function bindPageNavigationEvents() {
@@ -1696,7 +2203,556 @@ function bindPageNavigationEvents() {
   });
 }
 
+const TV_UI_QUERY_PARAM = "tv";
+const TV_FOCUSABLE_ATTRIBUTE = "data-tv-focusable";
+const TV_FOCUSABLE_SELECTOR = '[data-tv-focusable="1"]';
+const TV_INTERACTIVE_SELECTOR = [
+  "a[href]",
+  "button",
+  "input:not([type='hidden'])",
+  "select",
+  "textarea",
+  "summary",
+  "[role='button']",
+  "[role='tab']",
+  "[role='link']",
+  "[onclick]",
+  ".type-option",
+  ".source-option",
+  ".playlist-card",
+  ".song-card",
+  ".setting-toggle",
+  ".setting-link-row",
+  ".collection-item",
+  ".rt-btn",
+  ".rt-page-num",
+  ".aplayer-button",
+  ".aplayer-list-toggle",
+  ".vg-ctrl-icon",
+  ".vg-close",
+].join(",");
+
+let tvUIEnabled = false;
+let tvUIObserver = null;
+let tvInitialFocusTimer = 0;
+let tvActiveOverlay = null;
+let tvRestoreFocusElement = null;
+let tvKeyboardActive = false;
+
+function detectTVUIMode() {
+  const params = new URLSearchParams(window.location.search);
+  const requested = String(params.get(TV_UI_QUERY_PARAM) || "").toLowerCase();
+  if (requested === "1" || requested === "true" || requested === "yes") {
+    return true;
+  }
+  if (requested === "0" || requested === "false" || requested === "no") {
+    return false;
+  }
+
+  const ua = String(navigator.userAgent || "");
+  if (
+    /Android[ _-]?TV|Google[ _-]?TV|Fire[ _-]?TV|Smart[ _-]?TV|SMART-TV|BRAVIA|AFT[A-Z0-9]+|MiTV|MiBOX|NVIDIA[ _-]?SHIELD|Web0S|webOS\.TV/i.test(
+      ua,
+    )
+  ) {
+    return true;
+  }
+
+  try {
+    return (
+      window.matchMedia("(pointer: none)").matches &&
+      window.matchMedia("(min-width: 900px)").matches
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
+function tvElementVisible(element) {
+  if (!element || !element.isConnected) return false;
+  if (
+    element.hidden ||
+    element.matches(":disabled, [aria-disabled='true']") ||
+    element.closest(
+      "[hidden], [inert], [aria-hidden='true'], [aria-disabled='true']",
+    )
+  ) {
+    return false;
+  }
+  if (
+    element.matches(".source-option") &&
+    element.querySelector(".source-checkbox:disabled")
+  ) {
+    return false;
+  }
+
+  const style = window.getComputedStyle(element);
+  if (
+    style.display === "none" ||
+    style.visibility === "hidden" ||
+    style.visibility === "collapse" ||
+    style.pointerEvents === "none" ||
+    Number(style.opacity) === 0
+  ) {
+    return false;
+  }
+
+  const rect = element.getBoundingClientRect();
+  return rect.width > 1 && rect.height > 1;
+}
+
+function syncTVFocusableElements(root = document) {
+  if (!tvUIEnabled || !root || typeof root.querySelectorAll !== "function") {
+    return;
+  }
+
+  const elements = [];
+  if (root.nodeType === Node.ELEMENT_NODE && root.matches(TV_INTERACTIVE_SELECTOR)) {
+    elements.push(root);
+  }
+  root.querySelectorAll(TV_INTERACTIVE_SELECTOR).forEach((element) => {
+    elements.push(element);
+  });
+
+  elements.forEach((element) => {
+    if (
+      element.matches("input[type='radio'], input[type='checkbox']") &&
+      element.closest("label.type-option, label.setting-toggle")
+    ) {
+      return;
+    }
+
+    const forcedFocusTarget = element.matches("[data-settings-tab]");
+    if (
+      !forcedFocusTarget &&
+      element.hasAttribute("tabindex") &&
+      Number(element.getAttribute("tabindex")) < 0
+    ) {
+      return;
+    }
+    if (!element.hasAttribute("tabindex")) {
+      element.tabIndex = 0;
+    }
+    element.setAttribute(TV_FOCUSABLE_ATTRIBUTE, "1");
+  });
+}
+
+function visibleTVOverlays() {
+  return Array.from(
+    document.querySelectorAll(".modal-overlay, .vg-overlay"),
+  ).filter(tvElementVisible);
+}
+
+function getActiveTVOverlay() {
+  const overlays = visibleTVOverlays();
+  return overlays.length ? overlays[overlays.length - 1] : null;
+}
+
+function getTVFocusCandidates() {
+  syncTVFocusableElements(document);
+  const overlay = getActiveTVOverlay();
+  const scope = overlay || document;
+  return Array.from(scope.querySelectorAll(TV_FOCUSABLE_SELECTOR)).filter(
+    tvElementVisible,
+  );
+}
+
+function activeTVFocusElement() {
+  const active = document.activeElement;
+  if (active && active.matches && active.matches(TV_FOCUSABLE_SELECTOR)) {
+    return active;
+  }
+  if (active && active.closest) {
+    return active.closest(TV_FOCUSABLE_SELECTOR);
+  }
+  return null;
+}
+
+function centerOfRect(rect) {
+  return {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+  };
+}
+
+function overlapLength(aStart, aEnd, bStart, bEnd) {
+  return Math.max(0, Math.min(aEnd, bEnd) - Math.max(aStart, bStart));
+}
+
+function bestTVFocusCandidate(direction, current, candidates) {
+  const currentRect = current.getBoundingClientRect();
+  const currentCenter = centerOfRect(currentRect);
+  let best = null;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  candidates.forEach((candidate) => {
+    if (candidate === current || !tvElementVisible(candidate)) return;
+    const rect = candidate.getBoundingClientRect();
+    const center = centerOfRect(rect);
+    const dx = center.x - currentCenter.x;
+    const dy = center.y - currentCenter.y;
+
+    let primary = 0;
+    let perpendicular = 0;
+    let overlap = 0;
+    if (direction === "left") {
+      if (dx >= -4) return;
+      primary = -dx;
+      perpendicular = Math.abs(dy);
+      overlap = overlapLength(currentRect.top, currentRect.bottom, rect.top, rect.bottom);
+    } else if (direction === "right") {
+      if (dx <= 4) return;
+      primary = dx;
+      perpendicular = Math.abs(dy);
+      overlap = overlapLength(currentRect.top, currentRect.bottom, rect.top, rect.bottom);
+    } else if (direction === "up") {
+      if (dy >= -4) return;
+      primary = -dy;
+      perpendicular = Math.abs(dx);
+      overlap = overlapLength(currentRect.left, currentRect.right, rect.left, rect.right);
+    } else if (direction === "down") {
+      if (dy <= 4) return;
+      primary = dy;
+      perpendicular = Math.abs(dx);
+      overlap = overlapLength(currentRect.left, currentRect.right, rect.left, rect.right);
+    } else {
+      return;
+    }
+
+    let score = primary + perpendicular * 1.55 - overlap * 0.55;
+    if (overlap <= 0) {
+      score += 120;
+    }
+    if (primary < perpendicular * 0.22) {
+      score += 240;
+    }
+    if (score < bestScore) {
+      best = candidate;
+      bestScore = score;
+    }
+  });
+
+  return best;
+}
+
+function scrollTVFocusIntoView(element) {
+  if (!element || !tvElementVisible(element)) return;
+  const rect = element.getBoundingClientRect();
+  const topSafe = 54;
+  const bottomSafe = Math.max(180, window.innerHeight - 170);
+  if (rect.top >= topSafe && rect.bottom <= bottomSafe) {
+    return;
+  }
+  try {
+    element.scrollIntoView({
+      block: "center",
+      inline: "nearest",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+    });
+  } catch (_) {
+    element.scrollIntoView();
+  }
+}
+
+function markTVKeyboardNavigation() {
+  tvKeyboardActive = true;
+  document.body.classList.add("tv-keyboard-active");
+}
+
+function focusTVElement(element) {
+  if (!element || !tvElementVisible(element)) return false;
+  try {
+    element.focus({ preventScroll: true });
+  } catch (_) {
+    element.focus();
+  }
+  markTVKeyboardNavigation();
+  scrollTVFocusIntoView(element);
+  return document.activeElement === element;
+}
+
+function navigateTVFocus(direction) {
+  if (!tvUIEnabled) return false;
+  const candidates = getTVFocusCandidates();
+  if (!candidates.length) return false;
+
+  const current = activeTVFocusElement();
+  if (!current) {
+    focusTVElement(defaultTVFocusTarget(candidates));
+    return true;
+  }
+  const next = bestTVFocusCandidate(direction, current, candidates);
+  if (!next) return false;
+  return focusTVElement(next);
+}
+
+function firstTVFocusMatch(scope, selectors) {
+  for (const selector of selectors) {
+    const match = scope.querySelector(selector);
+    if (match && tvElementVisible(match)) {
+      return match;
+    }
+  }
+  return null;
+}
+
+function defaultTVFocusTarget(candidates) {
+  const overlay = getActiveTVOverlay();
+  const preferred = overlay
+    ? firstTVFocusMatch(overlay, [
+        "[data-tv-autofocus]",
+        ".settings-tab.is-active",
+        ".modal-close",
+        "button",
+        "a[href]",
+        "input:not([type='hidden'])",
+        "select",
+      ])
+    : firstTVFocusMatch(document, [
+        "[data-tv-default-focus]",
+        ".type-option",
+        ".source-option",
+        "#search-keyword",
+        "button",
+        "a[href]",
+      ]);
+  if (preferred && candidates.includes(preferred)) {
+    return preferred;
+  }
+  return candidates[0];
+}
+
+function scheduleTVInitialFocus() {
+  if (!tvUIEnabled) return;
+  window.clearTimeout(tvInitialFocusTimer);
+  tvInitialFocusTimer = window.setTimeout(() => {
+    syncTVFocusableElements(document);
+    const overlay = getActiveTVOverlay();
+    const active = activeTVFocusElement();
+    const activeBelongsInScope =
+      active && (!overlay || overlay.contains(active));
+    if (!activeBelongsInScope) {
+      focusTVElement(defaultTVFocusTarget(getTVFocusCandidates()));
+    }
+  }, 80);
+}
+
+function activateTVElement(element) {
+  if (!element || !tvElementVisible(element)) return false;
+  if (element.matches(".song-card")) {
+    const playButton = element.querySelector(".btn-play");
+    if (playButton) {
+      playButton.click();
+      return true;
+    }
+  }
+  if (element.matches(".collection-item")) {
+    const clickable = element.querySelector(".col-clickable-area");
+    if (clickable) {
+      clickable.click();
+      return true;
+    }
+  }
+  element.click();
+  return true;
+}
+
+function closeTVTopLayer() {
+  if (!tvUIEnabled) return false;
+
+  const videoOverlay = document.getElementById("vg-modal");
+  if (
+    videoOverlay &&
+    tvElementVisible(videoOverlay) &&
+    window.VideoGen &&
+    typeof window.VideoGen.close === "function"
+  ) {
+    window.VideoGen.close();
+    return true;
+  }
+
+  const overlay = getActiveTVOverlay();
+  if (overlay) {
+    const closeButton = overlay.querySelector(
+      "[data-tv-back], .modal-close, [onclick*='style.display = \"none\"'], [onclick*=\"style.display = 'none'\"]",
+    );
+    if (closeButton) {
+      closeButton.click();
+    } else {
+      overlay.style.display = "none";
+    }
+    if (tvRestoreFocusElement && tvElementVisible(tvRestoreFocusElement)) {
+      window.setTimeout(() => focusTVElement(tvRestoreFocusElement), 0);
+    }
+    return true;
+  }
+
+  const openTools = Array.from(
+    document.querySelectorAll(".song-list-tools-popover"),
+  ).find((popover) => !popover.hidden);
+  if (openTools) {
+    closeSongListTools();
+    return true;
+  }
+  return false;
+}
+
+function handleTVMediaKey(key) {
+  if (
+    key === "MediaPlayPause" ||
+    key === "PlayPause" ||
+    key === "MediaPlay" ||
+    key === "MediaPause"
+  ) {
+    togglePlayback();
+    return true;
+  }
+  if (key === "MediaTrackNext" || key === "MediaFastForward") {
+    switchTrackByOffset(1);
+    return true;
+  }
+  if (key === "MediaTrackPrevious" || key === "MediaRewind") {
+    switchTrackByOffset(-1);
+    return true;
+  }
+  return false;
+}
+
+function handleTVNavigationAction(action) {
+  if (!tvUIEnabled) return false;
+  if (
+    action === "up" ||
+    action === "down" ||
+    action === "left" ||
+    action === "right"
+  ) {
+    return navigateTVFocus(action);
+  }
+  if (action === "enter") {
+    return activateTVElement(document.activeElement);
+  }
+  if (action === "back") {
+    return closeTVTopLayer();
+  }
+  if (handleTVMediaKey(action)) {
+    return true;
+  }
+  return false;
+}
+
+function handleTVKeyboardEvent(event) {
+  if (!tvUIEnabled || event.defaultPrevented || event.isComposing) return;
+  if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+  const directionMap = {
+    ArrowUp: "up",
+    ArrowDown: "down",
+    ArrowLeft: "left",
+    ArrowRight: "right",
+  };
+  const direction = directionMap[event.key];
+  const current = document.activeElement;
+  const currentTag = current ? String(current.tagName || "").toLowerCase() : "";
+  const selectingControl =
+    currentTag === "select" ||
+    (current &&
+      current.matches &&
+      current.matches("input[type='range'], input[type='file']"));
+  const editingText =
+    current &&
+    current.matches &&
+    current.matches(
+      "input:not([type='button']):not([type='submit']):not([type='checkbox']):not([type='radio']):not([type='range']), textarea, [contenteditable='true']",
+    );
+
+  if (direction) {
+    if (
+      selectingControl ||
+      (editingText &&
+        currentTag === "textarea" &&
+        (direction === "up" || direction === "down" || direction === "left" || direction === "right")) ||
+      (editingText &&
+        currentTag === "input" &&
+        (direction === "left" || direction === "right"))
+    ) {
+      return;
+    }
+    if (handleTVNavigationAction(direction)) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    return;
+  }
+
+  if (event.key === "Enter" || event.key === "NumpadEnter") {
+    if (editingText || selectingControl || currentTag === "textarea") {
+      return;
+    }
+    if (handleTVNavigationAction("enter")) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    return;
+  }
+
+  if (event.key === "Escape" || event.key === "BrowserBack") {
+    if (handleTVNavigationAction("back")) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    return;
+  }
+
+  if (handleTVMediaKey(event.key)) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+}
+
+function initializeTVMode() {
+  tvUIEnabled = detectTVUIMode();
+  if (!tvUIEnabled) return;
+
+  document.documentElement.classList.add("tv-ui");
+  document.body.classList.add("tv-ui");
+  syncTVFocusableElements(document);
+  document.addEventListener("keydown", handleTVKeyboardEvent, true);
+  document.addEventListener(
+    "pointerdown",
+    () => {
+      tvKeyboardActive = false;
+      document.body.classList.remove("tv-keyboard-active");
+    },
+    { passive: true },
+  );
+  tvUIObserver = new MutationObserver(() => {
+    syncTVFocusableElements(document);
+    const nextOverlay = getActiveTVOverlay();
+    if (nextOverlay !== tvActiveOverlay) {
+      if (nextOverlay && !tvActiveOverlay) {
+        tvRestoreFocusElement = activeTVFocusElement();
+      }
+      tvActiveOverlay = nextOverlay;
+      scheduleTVInitialFocus();
+    }
+  });
+  tvUIObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["class", "hidden", "style", "aria-hidden"],
+  });
+
+  window.__musicDlTVNavigate = navigateTVFocus;
+  window.__musicDlTVHandleKey = handleTVNavigationAction;
+  window.__musicDlHandleBack = closeTVTopLayer;
+  scheduleTVInitialFocus();
+}
+
 document.addEventListener("DOMContentLoaded", function () {
+  initializeTVMode();
   loadWebSettingsFromCache();
   applyWebSettings(webSettings);
   bindSettingsTabs();
@@ -1705,6 +2761,8 @@ document.addEventListener("DOMContentLoaded", function () {
   fetchWebSettings().finally(() => maybeAutoCheckUpdate());
   bindPageNavigationEvents();
   initializePageContent(document);
+  syncTVFocusableElements(document);
+  scheduleTVInitialFocus();
   updateFloatPageNav();
   // 直接打开搜索结果链接，或 SPA 失败回退到整页加载时，同样把结果滚入视口。
   // 仅在 URL 带搜索词时触发，普通页面加载不受影响。
@@ -3993,57 +5051,92 @@ function openCookieModal() {
 async function saveCookies() {
   const webPageSizeInput = document.getElementById("setting-web-page-size");
   const cliPageSizeInput = document.getElementById("setting-cli-page-size");
+  const previousSearchFilters = {
+    filterVersionKeywords: webSettings.filterVersionKeywords,
+    versionFilterKeywords: webSettings.versionFilterKeywords,
+    filterShortTracks: webSettings.filterShortTracks,
+  };
 
-  const nextSettings = normalizeWebSettings({
-    embedDownload: !!document.getElementById("setting-embed-download")?.checked,
-    downloadDir: document.getElementById("setting-download-dir")?.value || "",
-    downloadFilenameTemplate:
-      document.getElementById("setting-download-filename-template")?.value ||
-      "",
-    downloadTipDuration: parsePositiveInt(
-      document.getElementById("setting-download-tip-duration")?.value,
-      DEFAULT_DOWNLOAD_TIP_DURATION,
-    ),
-    webdavEnabled: !!document.getElementById("setting-webdav-enabled")
-      ?.checked,
-    webdavUrl: document.getElementById("setting-webdav-url")?.value || "",
-    webdavUsername:
-      document.getElementById("setting-webdav-username")?.value || "",
-    webdavPassword:
-      document.getElementById("setting-webdav-password")?.value || "",
-    webdavDir: document.getElementById("setting-webdav-dir")?.value || "",
-    disableFloatingLyrics: !document.getElementById("setting-floating-lyrics")
-      ?.checked,
-    webPageSize: parsePositiveInt(
-      webPageSizeInput?.value,
-      DEFAULT_WEB_PAGE_SIZE,
-    ),
-    cliPageSize: parsePositiveInt(
-      cliPageSizeInput?.value,
-      DEFAULT_CLI_PAGE_SIZE,
-    ),
-    autoCheckUpdate: webSettings.autoCheckUpdate,
-    autoSwitchInvalidSources: !!document.getElementById(
-      "setting-auto-switch-invalid-sources",
-    )?.checked,
-    autoCacheOnPlay: !!document.getElementById("setting-auto-cache-on-play")
-      ?.checked,
-    updateRepoUrl: webSettings.updateRepoUrl || DEFAULT_UPDATE_REPO_URL,
-    githubProxyEnabled: !!webSettings.githubProxyEnabled,
-    githubProxyUrl: webSettings.githubProxyUrl || DEFAULT_GITHUB_PROXY_URL,
-    sodaSignerUrl:
-      document.getElementById("setting-soda-signer-url")?.value || "",
-    sodaSignerToken:
-      document.getElementById("setting-soda-signer-token")?.value || "",
-    vgChangeCover: !!document.getElementById("setting-vg-change-cover")
-      ?.checked,
-    vgChangeAudio: !!document.getElementById("setting-vg-change-audio")
-      ?.checked,
-    vgChangeLyric: !!document.getElementById("setting-vg-change-lyric")
-      ?.checked,
-    vgExportVideo: !!document.getElementById("setting-vg-export-video")
-      ?.checked,
-  });
+  let nextSettings;
+  try {
+    nextSettings = normalizeWebSettings({
+      embedDownload: !!document.getElementById("setting-embed-download")
+        ?.checked,
+      downloadDir: document.getElementById("setting-download-dir")?.value || "",
+      downloadFilenameTemplate:
+        document.getElementById("setting-download-filename-template")?.value ||
+        "",
+      downloadTipDuration: parsePositiveInt(
+        document.getElementById("setting-download-tip-duration")?.value,
+        DEFAULT_DOWNLOAD_TIP_DURATION,
+      ),
+      webdavEnabled: !!document.getElementById("setting-webdav-enabled")
+        ?.checked,
+      webdavUrl: document.getElementById("setting-webdav-url")?.value || "",
+      webdavUsername:
+        document.getElementById("setting-webdav-username")?.value || "",
+      webdavPassword:
+        document.getElementById("setting-webdav-password")?.value || "",
+      webdavDir: document.getElementById("setting-webdav-dir")?.value || "",
+      disableFloatingLyrics: !document.getElementById(
+        "setting-floating-lyrics",
+      )?.checked,
+      webPageSize: parsePositiveInt(
+        webPageSizeInput?.value,
+        DEFAULT_WEB_PAGE_SIZE,
+      ),
+      cliPageSize: parsePositiveInt(
+        cliPageSizeInput?.value,
+        DEFAULT_CLI_PAGE_SIZE,
+      ),
+      autoCheckUpdate: webSettings.autoCheckUpdate,
+      autoSwitchInvalidSources: !!document.getElementById(
+        "setting-auto-switch-invalid-sources",
+      )?.checked,
+      autoCacheOnPlay: !!document.getElementById("setting-auto-cache-on-play")
+        ?.checked,
+      filterVersionKeywords: !!document.getElementById(
+        "setting-filter-version-keywords",
+      )?.checked,
+      versionFilterKeywords:
+        document.getElementById("setting-version-filter-keywords")?.value ||
+        "Live, Remix, Demo",
+      filterShortTracks: !!document.getElementById(
+        "setting-filter-short-tracks",
+      )?.checked,
+      normalizeChineseVariants: !!document.getElementById(
+        "setting-normalize-chinese-variants",
+      )?.checked,
+      updateRepoUrl: webSettings.updateRepoUrl || DEFAULT_UPDATE_REPO_URL,
+      githubProxyEnabled: !!webSettings.githubProxyEnabled,
+      githubProxyUrl: webSettings.githubProxyUrl || DEFAULT_GITHUB_PROXY_URL,
+      sodaSignerUrl:
+        document.getElementById("setting-soda-signer-url")?.value || "",
+      sodaSignerToken:
+        document.getElementById("setting-soda-signer-token")?.value || "",
+      sodaClientDir:
+        document.getElementById("setting-soda-client-dir")?.value || "",
+      vgChangeCover: !!document.getElementById("setting-vg-change-cover")
+        ?.checked,
+      vgChangeAudio: !!document.getElementById("setting-vg-change-audio")
+        ?.checked,
+      vgChangeLyric: !!document.getElementById("setting-vg-change-lyric")
+        ?.checked,
+      vgExportVideo: !!document.getElementById("setting-vg-export-video")
+        ?.checked,
+      ...readPlaybackShortcutSettingsFromForm(),
+      lyricFontFamily: normalizeLyricFontFamily(
+        document.getElementById("setting-lyric-font-family")?.value,
+      ),
+      lyricFontSize: normalizeLyricFontSize(
+        document.getElementById("setting-lyric-font-size")?.value,
+      ),
+    });
+  } catch (error) {
+    setShortcutCaptureStatus(error.message, true);
+    alert(error.message || "快捷键设置无效");
+    return;
+  }
 
   const data = {};
   document.querySelectorAll('input[id^="cookie-"]').forEach((input) => {
@@ -4077,9 +5170,21 @@ async function saveCookies() {
     )
       return;
     if (!cookiesResponse.ok || !settingsResponse.ok) {
-      throw new Error("保存失败，请稍后重试");
+      throw new Error(
+        savedSettings?.error || cookiesPayload?.error || "保存失败，请稍后重试",
+      );
     }
     applyWebSettings(savedSettings || nextSettings);
+    const filtersChanged =
+      previousSearchFilters.filterVersionKeywords !==
+        webSettings.filterVersionKeywords ||
+      previousSearchFilters.versionFilterKeywords !==
+        webSettings.versionFilterKeywords ||
+      previousSearchFilters.filterShortTracks !==
+        webSettings.filterShortTracks;
+    if (filtersChanged && document.querySelector(".container")) {
+      await refreshCurrentPageContent({ scroll: false });
+    }
     setAuthFloatLoggedIn(true);
     alert("保存成功");
     document.getElementById("cookieModal").style.display = "none";
@@ -4090,7 +5195,6 @@ async function saveCookies() {
 
 window.addEventListener("scroll", () => {
   const topBtn = document.getElementById("back-to-top");
-  const bottomBtn = document.getElementById("back-to-bottom");
   if (topBtn) {
     if (window.scrollY > 300) {
       topBtn.classList.add("show");
@@ -4098,21 +5202,43 @@ window.addEventListener("scroll", () => {
       topBtn.classList.remove("show");
     }
   }
-  if (bottomBtn) {
-    if (window.scrollY > 300) {
-      bottomBtn.classList.add("show");
-    } else {
-      bottomBtn.classList.remove("show");
-    }
-  }
+  syncCurrentTrackLocator();
 });
 
 function scrollToTop() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function scrollToBottom() {
-  window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+function findSongCardById(songId) {
+  if (!songId) return null;
+  const targetId = String(songId);
+  return (
+    Array.from(document.querySelectorAll(".song-card")).find(
+      (card) => card.dataset.id === targetId,
+    ) || null
+  );
+}
+
+function findCurrentPlayingCard() {
+  return findSongCardById(currentPlayingId);
+}
+
+function syncCurrentTrackLocator() {
+  const button = document.getElementById("locate-current-track");
+  if (!button) return;
+  button.hidden = !findCurrentPlayingCard();
+}
+
+function scrollToCurrentPlaying() {
+  const card = findCurrentPlayingCard();
+  if (!card) {
+    syncCurrentTrackLocator();
+    showToast("当前播放歌曲不在本页", "可返回原列表或翻到歌曲所在页。", "info");
+    return;
+  }
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  card.classList.add("locate-flash");
+  window.setTimeout(() => card.classList.remove("locate-flash"), 900);
 }
 
 // ==========================================
@@ -4650,6 +5776,7 @@ function setupMediaSession() {
 
   registerMediaSessionAction("play", () => {
     if (!ap?.list?.audios?.length) return;
+    resumeVideoGenAudioRouting();
     ap.play();
   });
   registerMediaSessionAction("pause", () => {
@@ -5083,12 +6210,12 @@ const KaraokeLyrics = (() => {
 
 window.KaraokeLyrics = KaraokeLyrics;
 
-// APlayer Config. APlayer 由 CDN 加载，若 CDN 不可达会影响整个脚本；
-// 这里把初始化单独保护起来，避免播放器库缺失导致页面其他功能不可用。
+// APlayer Config. APlayer is bundled with the app. Guard initialization so
+// a player failure cannot interrupt the rest of the page.
 let ap = null;
 try {
   if (typeof APlayer === "undefined") {
-    throw new Error("APlayer CDN 未加载");
+    throw new Error("APlayer 资源未加载");
   }
   ap = new APlayer({
     container: document.getElementById("aplayer"),
@@ -5108,6 +6235,117 @@ try {
 }
 
 window.ap = ap;
+
+function resumeVideoGenAudioRouting() {
+  const videoGen = window.VideoGen;
+  if (videoGen && typeof videoGen.resumeAudioRouting === "function") {
+    videoGen.resumeAudioRouting();
+  }
+}
+
+// Resume the prepared Web Audio graph during the user's gesture, before
+// APlayer starts playback. This avoids rerouting active audio when the user
+// later opens the player-cover detail view.
+document.addEventListener("pointerdown", resumeVideoGenAudioRouting, {
+  capture: true,
+  passive: true,
+});
+document.addEventListener("keydown", resumeVideoGenAudioRouting, {
+  capture: true,
+});
+
+let lastTaskbarPlaybackState = "";
+
+function syncPlayerTrackControls() {
+  const player = document.querySelector(".aplayer.aplayer-fixed");
+  const hasTracks = Boolean(ap?.list?.audios?.length);
+  player?.classList.toggle("is-empty", !hasTracks);
+  if (!player) return;
+
+  const controls = [
+    [".aplayer-icon-back", "上一首"],
+    [".aplayer-icon-forward", "下一首"],
+    [".aplayer-icon-order", "切换播放模式"],
+    [".aplayer-icon-loop", "切换播放模式"],
+    [".aplayer-icon-menu", "播放列表"],
+    [".aplayer-icon-volume-down", "减小音量"],
+    [".aplayer-icon-volume-up", "增大音量"],
+    [".aplayer-icon-volume-off", "静音或恢复音量"],
+    [".aplayer-icon-lrc", "显示或隐藏歌词"],
+  ];
+  controls.forEach(([selector, label]) => {
+    const button = player.querySelector(selector);
+    if (!button) return;
+    button.title = label;
+    button.setAttribute("aria-label", label);
+  });
+
+  const playButton = player.querySelector(".aplayer-icon-play");
+  if (playButton) {
+    const label = ap?.audio && !ap.audio.paused ? "暂停" : "播放";
+    playButton.title = label;
+    playButton.setAttribute("aria-label", label);
+  }
+}
+
+function syncTaskbarPlaybackState() {
+  const hasTracks = Boolean(ap?.list?.audios?.length);
+  const isPlaying = Boolean(
+    hasTracks && ap?.audio && !ap.audio.paused && !ap.audio.ended,
+  );
+  const nextState = `${hasTracks}:${isPlaying}`;
+  if (nextState === lastTaskbarPlaybackState) return;
+  if (typeof window.musicDlTaskbarState !== "function") return;
+
+  lastTaskbarPlaybackState = nextState;
+  Promise.resolve(window.musicDlTaskbarState(hasTracks, isPlaying)).catch(
+    () => {
+      lastTaskbarPlaybackState = "";
+    },
+  );
+}
+
+window.musicDlTaskbarControl = function (action, value) {
+  switch (action) {
+    case "previous":
+      switchTrackByOffset(-1);
+      return true;
+    case "toggle":
+      togglePlayback();
+      return true;
+    case "next":
+      switchTrackByOffset(1);
+      return true;
+    case "play":
+      if (!ap?.list?.audios?.length) return false;
+      resumeVideoGenAudioRouting();
+      ap.play();
+      return true;
+    case "pause":
+      ap?.pause();
+      return true;
+    case "stop":
+      ap?.pause();
+      seekCurrentTrack(0);
+      currentPlayingId = null;
+      window.currentPlayingId = null;
+      highlightCard(null);
+      syncAllPlayButtons();
+      return true;
+    case "seek": {
+      const positionSeconds = (Number(value) || 0) / 1000;
+      seekCurrentTrack(positionSeconds);
+      return true;
+    }
+    default:
+      return false;
+  }
+};
+
+setInterval(syncPlayerTrackControls, 500);
+setInterval(syncTaskbarPlaybackState, 500);
+syncPlayerTrackControls();
+syncTaskbarPlaybackState();
 
 const PLAYER_SPEEDS = Object.freeze([
   0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3,
@@ -5233,6 +6471,7 @@ window.applyPlayerPlaybackRate = applyPlayerPlaybackRate;
     wrap.append(button, menu);
     apFixed.appendChild(wrap);
     applyPlayerPlaybackRate(playerSpeed);
+    syncPlayerTrackControls();
   }
 
   setTimeout(tryInject, 100);
@@ -5241,24 +6480,26 @@ window.applyPlayerPlaybackRate = applyPlayerPlaybackRate;
 applyPlayerPlaybackRate(playerSpeed);
 
 setupMediaSession();
-ap.audio.addEventListener("timeupdate", () => KaraokeLyrics.update());
-ap.audio.addEventListener("seeked", () => KaraokeLyrics.update());
-ap.audio.addEventListener("loadedmetadata", () => {
-  KaraokeLyrics.load(getCurrentAPlayerAudio());
-  applyPlayerPlaybackRate(playerSpeed);
-});
-ap.audio.addEventListener("emptied", () => {
-  applyPlayerPlaybackRate(playerSpeed);
-});
-ap.audio.addEventListener("play", () =>
-  KaraokeLyrics.handlePlayStateChange(true),
-);
-ap.audio.addEventListener("pause", () =>
-  KaraokeLyrics.handlePlayStateChange(false),
-);
-ap.audio.addEventListener("ended", () =>
-  KaraokeLyrics.handlePlayStateChange(false),
-);
+if (ap?.audio) {
+  ap.audio.addEventListener("timeupdate", () => KaraokeLyrics.update());
+  ap.audio.addEventListener("seeked", () => KaraokeLyrics.update());
+  ap.audio.addEventListener("loadedmetadata", () => {
+    KaraokeLyrics.load(getCurrentAPlayerAudio());
+    applyPlayerPlaybackRate(playerSpeed);
+  });
+  ap.audio.addEventListener("emptied", () => {
+    applyPlayerPlaybackRate(playerSpeed);
+  });
+  ap.audio.addEventListener("play", () =>
+    KaraokeLyrics.handlePlayStateChange(true),
+  );
+  ap.audio.addEventListener("pause", () =>
+    KaraokeLyrics.handlePlayStateChange(false),
+  );
+  ap.audio.addEventListener("ended", () =>
+    KaraokeLyrics.handlePlayStateChange(false),
+  );
+}
 
 // === 播放模式切换按钮 ===
 (function initPlayModeToggle() {
@@ -5321,6 +6562,7 @@ ap.audio.addEventListener("ended", () =>
     apFixed.appendChild(btn);
     refresh();
     if (modeIndex !== 0) applyMode(modeIndex);
+    syncPlayerTrackControls();
   }
 
   // 等 APlayer 渲染出来后再注入
@@ -5366,99 +6608,103 @@ setTimeout(() => {
   }
 }, 800);
 
-ap.on("listswitch", (e) => {
-  const index = e.index;
-  applyPlayerPlaybackRate(playerSpeed);
-  const newAudio = ap.list.audios[index];
-  const playbackCardID = getPlaybackCardID(newAudio);
-  if (playbackCardID) {
-    currentPlayingId = playbackCardID;
-    window.currentPlayingId = currentPlayingId;
-    highlightCard(currentPlayingId);
-    syncAllPlayButtons();
+if (ap && typeof ap.on === "function") {
+  ap.on("listswitch", (e) => {
+    const index = e.index;
+    applyPlayerPlaybackRate(playerSpeed);
+    const newAudio = ap.list.audios[index];
+    const playbackCardID = getPlaybackCardID(newAudio);
+    if (playbackCardID) {
+      currentPlayingId = playbackCardID;
+      window.currentPlayingId = currentPlayingId;
+      highlightCard(currentPlayingId);
+      syncAllPlayButtons();
 
-    const vgModal = document.getElementById("vg-modal");
-    if (vgModal && vgModal.classList.contains("active") && window.VideoGen) {
-      if (
-        !window.VideoGen.data ||
-        window.VideoGen.data.id !== newAudio.custom_id
-      ) {
-        window.VideoGen.open({
-          id: newAudio.custom_id,
-          source: newAudio.source || "netease",
-          name: newAudio.name,
-          artist: newAudio.artist,
-          album: newAudio.album || "",
-          cover: newAudio.cover,
-          duration: parseInt(newAudio.duration) || 0,
-          extra: newAudio.extra || "",
-        });
+      const vgModal = document.getElementById("vg-modal");
+      if (vgModal && vgModal.classList.contains("active") && window.VideoGen) {
+        if (
+          !window.VideoGen.data ||
+          window.VideoGen.data.id !== newAudio.custom_id
+        ) {
+          window.VideoGen.open({
+            id: newAudio.custom_id,
+            source: newAudio.source || "netease",
+            name: newAudio.name,
+            artist: newAudio.artist,
+            album: newAudio.album || "",
+            cover: newAudio.cover,
+            duration: parseInt(newAudio.duration) || 0,
+            extra: newAudio.extra || "",
+          });
+        }
       }
     }
-  }
-  if (
-    newAudio &&
-    newAudio.source !== "local" &&
-    newAudio.source !== "local-file"
-  ) {
-    scheduleAutoCache(newAudio);
-  }
-  syncMediaSession(newAudio || getCurrentAPlayerAudio());
-  scheduleMediaSessionSync(newAudio || getCurrentAPlayerAudio(), 180);
-  KaraokeLyrics.load(newAudio || getCurrentAPlayerAudio());
-});
+    if (
+      newAudio &&
+      newAudio.source !== "local" &&
+      newAudio.source !== "local-file"
+    ) {
+      scheduleAutoCache(newAudio);
+    }
+    syncMediaSession(newAudio || getCurrentAPlayerAudio());
+    scheduleMediaSessionSync(newAudio || getCurrentAPlayerAudio(), 180);
+    KaraokeLyrics.load(newAudio || getCurrentAPlayerAudio());
+  });
 
-ap.on("play", () => {
-  applyPlayerPlaybackRate(playerSpeed);
-  const idx = ap?.list?.index;
-  const audio = typeof idx === "number" ? ap.list.audios[idx] : null;
-  rememberPlaybackHistory(audio);
-  const playbackCardID = getPlaybackCardID(audio);
-  if (playbackCardID) {
-    currentPlayingId = playbackCardID;
-    window.currentPlayingId = currentPlayingId;
-    highlightCard(currentPlayingId);
-  }
-  syncAllPlayButtons();
-  syncMediaSession(audio || getCurrentAPlayerAudio());
-  scheduleMediaSessionSync(audio || getCurrentAPlayerAudio(), 180);
-  KaraokeLyrics.load(audio || getCurrentAPlayerAudio());
+  ap.on("play", () => {
+    resumeVideoGenAudioRouting();
+    applyPlayerPlaybackRate(playerSpeed);
+    syncTaskbarPlaybackState();
+    const idx = ap?.list?.index;
+    const audio = typeof idx === "number" ? ap.list.audios[idx] : null;
+    rememberPlaybackHistory(audio);
+    const playbackCardID = getPlaybackCardID(audio);
+    if (playbackCardID) {
+      currentPlayingId = playbackCardID;
+      window.currentPlayingId = currentPlayingId;
+      highlightCard(currentPlayingId);
+    }
+    syncAllPlayButtons();
+    syncMediaSession(audio || getCurrentAPlayerAudio());
+    scheduleMediaSessionSync(audio || getCurrentAPlayerAudio(), 180);
+    KaraokeLyrics.load(audio || getCurrentAPlayerAudio());
 
-  if (audio && audio.source !== "local" && audio.source !== "local-file") {
-    scheduleAutoCache(audio);
-  }
+    if (audio && audio.source !== "local" && audio.source !== "local-file") {
+      scheduleAutoCache(audio);
+    }
 
-  if (window.VideoGen && window.VideoGen.updatePlayBtnState) {
-    window.VideoGen.updatePlayBtnState(true);
-  }
-});
+    if (window.VideoGen && window.VideoGen.updatePlayBtnState) {
+      window.VideoGen.updatePlayBtnState(true);
+    }
+  });
 
-ap.on("pause", () => {
-  syncAllPlayButtons();
-  syncMediaSession();
-  if (window.VideoGen && window.VideoGen.updatePlayBtnState) {
-    window.VideoGen.updatePlayBtnState(false);
-  }
-});
+  ap.on("pause", () => {
+    syncTaskbarPlaybackState();
+    syncAllPlayButtons();
+    syncMediaSession();
+    if (window.VideoGen && window.VideoGen.updatePlayBtnState) {
+      window.VideoGen.updatePlayBtnState(false);
+    }
+  });
 
-ap.on("ended", () => {
-  currentPlayingId = null;
-  window.currentPlayingId = null;
-  highlightCard(null);
-  syncAllPlayButtons();
-  scheduleMediaSessionSync(getCurrentAPlayerAudio(), 180);
-  KaraokeLyrics.hide();
-});
+  ap.on("ended", () => {
+    syncTaskbarPlaybackState();
+    currentPlayingId = null;
+    window.currentPlayingId = null;
+    highlightCard(null);
+    syncAllPlayButtons();
+    scheduleMediaSessionSync(getCurrentAPlayerAudio(), 180);
+    KaraokeLyrics.hide();
+  });
+}
 
 function highlightCard(targetId) {
   document
     .querySelectorAll(".song-card")
     .forEach((c) => c.classList.remove("playing-active"));
-  if (!targetId) return;
-  const target = document.querySelector(`.song-card[data-id="${targetId}"]`);
-  if (target) {
-    target.classList.add("playing-active");
-  }
+  const target = findSongCardById(targetId);
+  target?.classList.add("playing-active");
+  syncCurrentTrackLocator();
 }
 
 function setPlayButtonState(card, isPlaying) {
@@ -5661,8 +6907,8 @@ function syncLocalSongActionButtons(card, song) {
     lyric.href = lyricURLsForSong(song).download;
     lyric.innerHTML = '<i class="fa-solid fa-file-lines"></i>';
     const coverBtn = actions.querySelector(".btn-cover");
-    if (coverBtn) {
-      actions.insertBefore(lyric, coverBtn);
+    if (coverBtn?.parentNode) {
+      coverBtn.parentNode.insertBefore(lyric, coverBtn);
     } else {
       insertBefore(lyric);
     }
@@ -5677,6 +6923,7 @@ function syncLocalSongActionButtons(card, song) {
     cover.innerHTML = '<i class="fa-regular fa-image"></i>';
     insertBefore(cover);
   }
+  ensureSongActionFold(card);
 }
 
 function updateCardWithSong(card, song, options = {}) {
