@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -492,6 +493,7 @@ func renderIndex(c *gin.Context, songs []model.Song, playlists []model.Playlist,
 		"ColID":                   colID,
 		"ColName":                 colName,
 		"CollectionKind":          collectionKind,
+		"CollectionContentType":   c.GetString("CollectionContentType"),
 		"ImportCollection":        importCollection,
 		"CanRemoveSongs":          colID != "" && collectionKind == collectionKindManual,
 		"IsLocalColPage":          isLocalColPage,
@@ -546,7 +548,7 @@ func StartWithOptions(port string, opts StartOptions) {
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
-	r.Use(corsMiddleware())
+	r.Use(corsMiddleware(), gzipMiddleware())
 
 	tmpl := template.Must(template.New("").Funcs(template.FuncMap{
 		"artistTokens":       splitArtistTokens,
@@ -574,8 +576,14 @@ func StartWithOptions(port string, opts StartOptions) {
 	videoDir := "data/video_output"
 	os.MkdirAll(videoDir, 0755)
 
+	queue, err := core.OpenDownloadQueue()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Initialize download queue: %v\n", err)
+		return
+	}
+
 	api := r.Group(RoutePrefix)
-	registerWebRoutes(api, opts, videoDir)
+	registerWebRoutes(api, opts, videoDir, queue)
 
 	listenAddr := opts.ListenHost + ":" + port
 	listener, err := net.Listen("tcp", listenAddr)
@@ -585,6 +593,14 @@ func StartWithOptions(port string, opts StartOptions) {
 			return
 		}
 		fmt.Fprintf(os.Stderr, "Failed to start web server on %s: %v\n", listenAddr, err)
+		return
+	}
+
+	queueContext, stopQueue := context.WithCancel(context.Background())
+	defer stopQueue()
+	if err := queue.Start(queueContext, processQueuedDownload); err != nil {
+		_ = listener.Close()
+		fmt.Fprintf(os.Stderr, "Start download queue: %v\n", err)
 		return
 	}
 
@@ -606,7 +622,7 @@ func renderRootIndex(c *gin.Context) {
 	renderIndex(c, nil, nil, "", nil, "", "song", "", "", "", false, "", nil)
 }
 
-func registerWebRoutes(api *gin.RouterGroup, opts StartOptions, videoDir string) {
+func registerWebRoutes(api *gin.RouterGroup, opts StartOptions, videoDir string, queue *core.DownloadQueue) {
 
 	api.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -674,6 +690,7 @@ func registerWebRoutes(api *gin.RouterGroup, opts StartOptions, videoDir string)
 	RegisterLocalMusicRoutes(api)
 	RegisterVideogenRoutes(api, videoDir)
 	RegisterUpdateRoutes(api)
+	RegisterDownloadQueueRoutes(api, queue)
 }
 
 func embeddedVendorFS() (fs.FS, error) {

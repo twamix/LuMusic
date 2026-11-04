@@ -14,7 +14,6 @@ func TestVideoGenPrewarmsPlayerAudioRouting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read app.js: %v", err)
 	}
-
 	// Embedded sources may be checked out with CRLF line endings on Windows.
 	videoSrc := normalizeLineEndings(string(videoJS))
 	appSrc := normalizeLineEndings(string(appJS))
