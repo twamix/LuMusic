@@ -1953,16 +1953,6 @@ body.vg-open .aplayer.aplayer-fixed {
 .collection-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 10px; transition: all 0.2s; background: #faf8f8; cursor: pointer;}
 .collection-item:hover { border-color: #10b981; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15); }
 
-/* 返回顶部按钮 */
-
-
-
-    background: #10b981;
-    color: white;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(16, 185, 129, 0.3);
-}
-
 .aplayer.aplayer-fixed { z-index: 10000 !important; }
 
 .aplayer.aplayer-fixed .playmode-toggle-btn {
