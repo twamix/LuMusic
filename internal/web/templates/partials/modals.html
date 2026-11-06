@@ -176,6 +176,14 @@
                     </label>
                     <p class="setting-hint">影响“保存到本地目录”和“浏览器下载”两种方式；播放始终使用流式下载，不内嵌元数据。</p>
                 </div>
+                <div class="cookie-item setting-item">
+                    <label class="setting-toggle" for="setting-download-lyrics-to-local">
+                        <input type="checkbox" id="setting-download-lyrics-to-local">
+                        <span class="setting-switch" aria-hidden="true"></span>
+                        <span class="setting-toggle-text">保存音乐时同时生成同名 LRC</span>
+                    </label>
+                    <p class="setting-hint">开启后保存音乐会在音频同目录生成标准 LRC，歌词按钮也会直接保存到本地目录；关闭时保留浏览器下载。已有同名歌词不会被覆盖。</p>
+                </div>
                 <div class="cookie-item">
                     <label for="setting-download-dir">本地下载目录</label>
                     <div class="download-dir-control">
@@ -305,6 +313,7 @@
                 </div>
                 <div class="cookie-list">
                     {{ range $source := .AllSources }}
+                    {{ if ne $source "local" }}
                     <div class="cookie-item">
                         <label>{{ $source }}</label>
                         <div class="cookie-input-row">
@@ -330,6 +339,7 @@
                         <p id="cookie-hint-{{$source}}" class="setting-hint cookie-source-hint">本地音乐直接从下载目录读取文件，不需要 Cookie。</p>
                         {{ end }}
                     </div>
+                    {{ end }}
                     {{ end }}
                 </div>
                 <div class="settings-panel-subtitle">汽水音乐整曲取流（会员音质）</div>
