@@ -559,6 +559,16 @@ func inspectFailurePayload(retryable bool, reason string, retryAfter time.Durati
 	return payload
 }
 
+func inspectSuccessPayload(source, urlStr, size, bitrate string) gin.H {
+	return gin.H{
+		"valid":   true,
+		"status":  "valid",
+		"url":     urlStr,
+		"size":    size,
+		"bitrate": bitrate,
+	}
+}
+
 func defaultInspectRetryDelay(statusCode int) time.Duration {
 	switch statusCode {
 	case http.StatusTooManyRequests:
@@ -851,6 +861,7 @@ func RegisterMusicRoutes(api, configAPI *gin.RouterGroup) {
 		} else {
 			var wg sync.WaitGroup
 			var mu sync.Mutex
+			sourceErrors := make(map[string]string)
 
 			for _, src := range sources {
 				if isLocalMusicSource(src) {
@@ -870,7 +881,15 @@ func RegisterMusicRoutes(api, configAPI *gin.RouterGroup) {
 								mu.Lock()
 								allPlaylists = append(allPlaylists, res...)
 								mu.Unlock()
+							} else {
+								mu.Lock()
+								sourceErrors[s] = err.Error()
+								mu.Unlock()
 							}
+						} else {
+							mu.Lock()
+							sourceErrors[s] = "该来源不支持歌单搜索"
+							mu.Unlock()
 						}
 					} else if searchType == "album" {
 						fn := core.GetAlbumSearchFunc(s)
@@ -883,7 +902,15 @@ func RegisterMusicRoutes(api, configAPI *gin.RouterGroup) {
 								mu.Lock()
 								allPlaylists = append(allPlaylists, res...)
 								mu.Unlock()
+							} else {
+								mu.Lock()
+								sourceErrors[s] = err.Error()
+								mu.Unlock()
 							}
+						} else {
+							mu.Lock()
+							sourceErrors[s] = "该来源不支持专辑搜索"
+							mu.Unlock()
 						}
 					} else {
 						fn := core.GetSearchFunc(s)
@@ -896,12 +923,21 @@ func RegisterMusicRoutes(api, configAPI *gin.RouterGroup) {
 								mu.Lock()
 								allSongs = append(allSongs, res...)
 								mu.Unlock()
+							} else {
+								mu.Lock()
+								sourceErrors[s] = err.Error()
+								mu.Unlock()
 							}
+						} else {
+							mu.Lock()
+							sourceErrors[s] = "该来源不支持歌曲搜索"
+							mu.Unlock()
 						}
 					}
 				}(src)
 			}
 			wg.Wait()
+			errorMsg = formatSearchSourceErrors(sources, sourceErrors)
 
 			if searchType == "song" && containsLocalSource(sources) {
 				localSongs := localMusicSearchSongs(keyword, 200)
@@ -924,7 +960,6 @@ func RegisterMusicRoutes(api, configAPI *gin.RouterGroup) {
 		if searchType == "song" && exactArtist != "" && len(allSongs) > 0 {
 			allSongs = filterSongsByExactArtist(allSongs, exactArtist)
 		}
-
 		renderIndex(c, allSongs, allPlaylists, keyword, sources, errorMsg, searchType, "", "", "", false, "", importCollection)
 	})
 
@@ -1100,13 +1135,7 @@ func RegisterMusicRoutes(api, configAPI *gin.RouterGroup) {
 			}
 		}
 
-		c.JSON(200, gin.H{
-			"valid":   valid,
-			"status":  "valid",
-			"url":     urlStr,
-			"size":    core.FormatSize(size),
-			"bitrate": bitrate,
-		})
+		c.JSON(200, inspectSuccessPayload(src, urlStr, core.FormatSize(size), bitrate))
 	})
 
 	api.GET("/switch_source", func(c *gin.Context) {
@@ -1409,8 +1438,6 @@ func RegisterMusicRoutes(api, configAPI *gin.RouterGroup) {
 
 	downloadLRCHandler := func(c *gin.Context) {
 		song := lyricSongFromQuery(c)
-		name := song.Name
-		artist := song.Artist
 		saveLocal := wantsSaveLocal(c)
 		if saveLocal && !allowSaveLocalRequest(c) {
 			return
@@ -1438,8 +1465,7 @@ func RegisterMusicRoutes(api, configAPI *gin.RouterGroup) {
 				c.String(http.StatusNotFound, "Lyric not found")
 				return
 			}
-			settings := core.GetWebSettings()
-			filename := core.BuildDownloadFilename(song, "lrc", settings.DownloadFilenameTemplate)
+			filename := lyricDownloadFilename(song)
 			c.Header("X-Lyric-Format", classifyLyricFormat(standardLRC))
 			saveWebAssetRelativeResponse(c, filename, []byte(standardLRC))
 			return
@@ -1447,7 +1473,7 @@ func RegisterMusicRoutes(api, configAPI *gin.RouterGroup) {
 		lrc = formatLyricForMode(lrc, c.DefaultQuery("format", "auto"))
 		c.Header("X-Lyric-Format", classifyLyricFormat(lrc))
 
-		filename := fmt.Sprintf("%s - %s.lrc", name, artist)
+		filename := lyricDownloadFilename(song)
 		setDownloadHeader(c, filename)
 		c.String(200, lrc)
 	}
@@ -1739,6 +1765,11 @@ func lyricSongFromQuery(c *gin.Context) *model.Song {
 		Duration: duration,
 		Extra:    parseSongExtraQuery(c.Query("extra")),
 	}
+}
+
+func lyricDownloadFilename(song *model.Song) string {
+	settings := core.GetWebSettings()
+	return core.BuildDownloadFilename(song, "lrc", settings.DownloadFilenameTemplate)
 }
 
 type switchCandidate struct {
@@ -2038,4 +2069,42 @@ func parseSongExtraQuery(raw string) map[string]string {
 		return nil
 	}
 	return extra
+}
+
+func formatSearchSourceErrors(
+	sources []string,
+	errorsBySource map[string]string,
+) string {
+	if len(errorsBySource) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(errorsBySource))
+	seen := make(map[string]struct{}, len(sources))
+	for _, source := range sources {
+		if isLocalMusicSource(source) {
+			continue
+		}
+		if _, exists := seen[source]; exists {
+			continue
+		}
+		seen[source] = struct{}{}
+		message := strings.TrimSpace(errorsBySource[source])
+		if message == "" {
+			continue
+		}
+		messageRunes := []rune(message)
+		if len(messageRunes) > 220 {
+			message = string(messageRunes[:220]) + "…"
+		}
+		label := core.GetSourceDescription(source)
+		parts = append(parts, fmt.Sprintf("%s: %s", label, message))
+	}
+	switch len(parts) {
+	case 0:
+		return ""
+	case 1:
+		return "搜索失败: " + parts[0]
+	default:
+		return "部分平台搜索失败: " + strings.Join(parts, "；")
+	}
 }
