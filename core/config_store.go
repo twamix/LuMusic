@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/glebarez/sqlite"
+	"github.com/guohuiyuan/music-lib/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -27,6 +28,10 @@ const (
 	DefaultShortcutPlayPause        = "Space"
 	DefaultLyricFontFamily          = "system"
 	DefaultLyricFontSize            = 24
+	DefaultThemeMode                = "light"
+	DefaultAccentColor              = "#10b981"
+	DefaultLyricHighlightColor      = "#10b981"
+	DefaultAudioQuality             = "high"
 	DefaultUpdateRepoURL            = "https://github.com/twamix/LuMusic"
 	DefaultGithubProxyURL           = "https://edgeone.gh-proxy.com"
 	webSettingsKey                  = "web_settings"
@@ -48,45 +53,50 @@ type cookieEntry struct {
 }
 
 type WebSettings struct {
-	EmbedDownload            bool   `json:"embedDownload"`
-	DownloadToLocal          bool   `json:"downloadToLocal"`
-	DownloadLyricsToLocal    bool   `json:"downloadLyricsToLocal"`
-	DownloadDir              string `json:"downloadDir"`
-	DownloadFilenameTemplate string `json:"downloadFilenameTemplate"`
-	DownloadTipDuration      int    `json:"downloadTipDuration"`
-	WebDAVEnabled            bool   `json:"webdavEnabled"`
-	WebDAVURL                string `json:"webdavUrl"`
-	WebDAVUsername           string `json:"webdavUsername"`
-	WebDAVPassword           string `json:"webdavPassword"`
-	WebDAVDir                string `json:"webdavDir"`
-	DisableFloatingLyrics    bool   `json:"disableFloatingLyrics"`
-	WebPageSize              int    `json:"webPageSize"`
-	CliPageSize              int    `json:"cliPageSize"`
-	DownloadConcurrency      int    `json:"downloadConcurrency"`
-	AutoCheckUpdate          bool   `json:"autoCheckUpdate"`
-	AutoSwitchInvalidSources bool   `json:"autoSwitchInvalidSources"`
-	AutoCacheOnPlay          bool   `json:"autoCacheOnPlay"`
-	FilterVersionKeywords    bool   `json:"filterVersionKeywords"`
-	VersionFilterKeywords    string `json:"versionFilterKeywords"`
-	FilterShortTracks        bool   `json:"filterShortTracks"`
-	NormalizeChineseVariants bool   `json:"normalizeChineseVariants"`
-	UpdateRepoURL            string `json:"updateRepoUrl"`
-	GithubProxyEnabled       bool   `json:"githubProxyEnabled"`
-	GithubProxyURL           string `json:"githubProxyUrl"`
-	SodaSignerURL            string `json:"sodaSignerUrl"`
-	SodaSignerToken          string `json:"sodaSignerToken"`
-	SodaClientDir            string `json:"sodaClientDir"`
-	VgChangeCover            bool   `json:"vgChangeCover"`
-	VgChangeAudio            bool   `json:"vgChangeAudio"`
-	VgChangeLyric            bool   `json:"vgChangeLyric"`
-	VgExportVideo            bool   `json:"vgExportVideo"`
-	ShortcutPlayPause        string `json:"shortcutPlayPause"`
-	ShortcutPrevious         string `json:"shortcutPrevious"`
-	ShortcutNext             string `json:"shortcutNext"`
-	ShortcutSeekBack         string `json:"shortcutSeekBack"`
-	ShortcutSeekForward      string `json:"shortcutSeekForward"`
-	LyricFontFamily          string `json:"lyricFontFamily"`
-	LyricFontSize            int    `json:"lyricFontSize"`
+	EmbedDownload            bool              `json:"embedDownload"`
+	DownloadToLocal          bool              `json:"downloadToLocal"`
+	DownloadLyricsToLocal    bool              `json:"downloadLyricsToLocal"`
+	DownloadDir              string            `json:"downloadDir"`
+	DownloadFilenameTemplate string            `json:"downloadFilenameTemplate"`
+	DownloadTipDuration      int               `json:"downloadTipDuration"`
+	DefaultAudioQuality      string            `json:"defaultAudioQuality"`
+	AudioQualityDefaults     map[string]string `json:"audioQualityDefaults,omitempty"`
+	WebDAVEnabled            bool              `json:"webdavEnabled"`
+	WebDAVURL                string            `json:"webdavUrl"`
+	WebDAVUsername           string            `json:"webdavUsername"`
+	WebDAVPassword           string            `json:"webdavPassword"`
+	WebDAVDir                string            `json:"webdavDir"`
+	DisableFloatingLyrics    bool              `json:"disableFloatingLyrics"`
+	WebPageSize              int               `json:"webPageSize"`
+	CliPageSize              int               `json:"cliPageSize"`
+	DownloadConcurrency      int               `json:"downloadConcurrency"`
+	AutoCheckUpdate          bool              `json:"autoCheckUpdate"`
+	AutoSwitchInvalidSources bool              `json:"autoSwitchInvalidSources"`
+	AutoCacheOnPlay          bool              `json:"autoCacheOnPlay"`
+	FilterVersionKeywords    bool              `json:"filterVersionKeywords"`
+	VersionFilterKeywords    string            `json:"versionFilterKeywords"`
+	FilterShortTracks        bool              `json:"filterShortTracks"`
+	NormalizeChineseVariants bool              `json:"normalizeChineseVariants"`
+	UpdateRepoURL            string            `json:"updateRepoUrl"`
+	GithubProxyEnabled       bool              `json:"githubProxyEnabled"`
+	GithubProxyURL           string            `json:"githubProxyUrl"`
+	SodaSignerURL            string            `json:"sodaSignerUrl"`
+	SodaSignerToken          string            `json:"sodaSignerToken"`
+	SodaClientDir            string            `json:"sodaClientDir"`
+	VgChangeCover            bool              `json:"vgChangeCover"`
+	VgChangeAudio            bool              `json:"vgChangeAudio"`
+	VgChangeLyric            bool              `json:"vgChangeLyric"`
+	VgExportVideo            bool              `json:"vgExportVideo"`
+	ShortcutPlayPause        string            `json:"shortcutPlayPause"`
+	ShortcutPrevious         string            `json:"shortcutPrevious"`
+	ShortcutNext             string            `json:"shortcutNext"`
+	ShortcutSeekBack         string            `json:"shortcutSeekBack"`
+	ShortcutSeekForward      string            `json:"shortcutSeekForward"`
+	LyricFontFamily          string            `json:"lyricFontFamily"`
+	LyricFontSize            int               `json:"lyricFontSize"`
+	ThemeMode                string            `json:"themeMode"`
+	AccentColor              string            `json:"accentColor"`
+	LyricHighlightColor      string            `json:"lyricHighlightColor"`
 }
 
 type WebAuthSettings struct {
@@ -212,6 +222,8 @@ func defaultWebSettings() WebSettings {
 		DownloadLyricsToLocal:    false,
 		DownloadDir:              DefaultWebDownloadDir,
 		DownloadFilenameTemplate: DefaultDownloadFilenameTemplate,
+		DefaultAudioQuality:      DefaultAudioQuality,
+		AudioQualityDefaults:     defaultAudioQualityDefaults(),
 		DisableFloatingLyrics:    false,
 		WebPageSize:              DefaultWebPageSize,
 		CliPageSize:              DefaultCLIPageSize,
@@ -230,6 +242,9 @@ func defaultWebSettings() WebSettings {
 		ShortcutPlayPause:        DefaultShortcutPlayPause,
 		LyricFontFamily:          DefaultLyricFontFamily,
 		LyricFontSize:            DefaultLyricFontSize,
+		ThemeMode:                DefaultThemeMode,
+		AccentColor:              DefaultAccentColor,
+		LyricHighlightColor:      DefaultLyricHighlightColor,
 		// 默认不配远程签名服务：soda 包会优先用本机官方客户端的 bdms.node 签名。
 		SodaSignerURL:   "",
 		SodaSignerToken: "",
@@ -251,6 +266,8 @@ func normalizeWebSettings(settings WebSettings) WebSettings {
 	if settings.DownloadFilenameTemplate == "" {
 		settings.DownloadFilenameTemplate = DefaultDownloadFilenameTemplate
 	}
+	settings.DefaultAudioQuality = normalizeDefaultAudioQuality(settings.DefaultAudioQuality)
+	settings.AudioQualityDefaults = normalizeAudioQualityDefaults(settings.AudioQualityDefaults)
 	settings.WebDAVURL = strings.TrimSpace(settings.WebDAVURL)
 	settings.WebDAVUsername = strings.TrimSpace(settings.WebDAVUsername)
 	settings.WebDAVDir = strings.Trim(strings.TrimSpace(settings.WebDAVDir), "/")
@@ -311,6 +328,9 @@ func normalizeWebSettings(settings WebSettings) WebSettings {
 	if settings.LyricFontSize > 48 {
 		settings.LyricFontSize = 48
 	}
+	settings.ThemeMode = normalizeThemeMode(settings.ThemeMode)
+	settings.AccentColor = normalizeWebColor(settings.AccentColor, DefaultAccentColor)
+	settings.LyricHighlightColor = normalizeWebColor(settings.LyricHighlightColor, DefaultLyricHighlightColor)
 	settings.DownloadDir = normalizeWebDownloadDir(settings.DownloadDir)
 	return settings
 }
@@ -323,6 +343,32 @@ func normalizeLyricFontFamily(value string) string {
 	default:
 		return DefaultLyricFontFamily
 	}
+}
+
+func normalizeThemeMode(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "light", "dark", "system":
+		return strings.ToLower(strings.TrimSpace(value))
+	default:
+		return DefaultThemeMode
+	}
+}
+
+func normalizeWebColor(value, fallback string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if len(value) == 7 && value[0] == '#' {
+		valid := true
+		for _, char := range value[1:] {
+			if (char < '0' || char > '9') && (char < 'a' || char > 'f') {
+				valid = false
+				break
+			}
+		}
+		if valid {
+			return value
+		}
+	}
+	return fallback
 }
 
 func normalizeShortcutBinding(binding string) string {
@@ -468,6 +514,62 @@ func validateWebSettings(settings WebSettings) error {
 		seen[shortcut.value] = shortcut.name
 	}
 	return nil
+}
+
+func normalizeDefaultAudioQuality(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return DefaultAudioQuality
+	}
+	quality, ok := model.NormalizeAudioQuality(value)
+	if !ok {
+		return DefaultAudioQuality
+	}
+	if quality == model.AudioQualityAuto {
+		return string(model.AudioQualityAuto)
+	}
+	return string(quality)
+}
+
+func defaultAudioQualityDefaults() map[string]string {
+	return map[string]string{
+		"qq":       DefaultAudioQuality,
+		"netease":  DefaultAudioQuality,
+		"kugou":    DefaultAudioQuality,
+		"kuwo":     DefaultAudioQuality,
+		"migu":     DefaultAudioQuality,
+		"soda":     DefaultAudioQuality,
+		"qianqian": DefaultAudioQuality,
+		"apple":    string(model.AudioQualityPreview),
+	}
+}
+
+func normalizeAudioQualityDefaults(values map[string]string) map[string]string {
+	result := defaultAudioQualityDefaults()
+	for source, value := range values {
+		source = strings.ToLower(strings.TrimSpace(source))
+		if source == "" {
+			continue
+		}
+		quality, ok := model.NormalizeAudioQuality(value)
+		if !ok {
+			continue
+		}
+		result[source] = string(quality)
+	}
+	return result
+}
+
+// AudioQualityDefaultForSource returns the configured default for one source.
+// It keeps the older single-value setting as a fallback for migrated configs.
+func AudioQualityDefaultForSource(source string) string {
+	source = strings.ToLower(strings.TrimSpace(source))
+	settings := GetWebSettings()
+	if quality, ok := settings.AudioQualityDefaults[source]; ok {
+		if normalized, valid := model.NormalizeAudioQuality(quality); valid {
+			return string(normalized)
+		}
+	}
+	return normalizeDefaultAudioQuality(settings.DefaultAudioQuality)
 }
 
 func normalizeWebAuthSettings(settings WebAuthSettings) WebAuthSettings {

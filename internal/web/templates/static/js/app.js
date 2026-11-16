@@ -28,6 +28,41 @@ const DOWNLOAD_DIR_PRESETS = new Set(DOWNLOAD_DIR_PRESET_VALUES);
 const DEFAULT_UPDATE_REPO_URL = "https://github.com/twamix/LuMusic";
 const DEFAULT_GITHUB_PROXY_URL = "https://edgeone.gh-proxy.com";
 const DEFAULT_DOWNLOAD_TIP_DURATION = 8;
+const DEFAULT_AUDIO_QUALITY = "high";
+const DEFAULT_AUDIO_QUALITY_OPTIONS = Object.freeze([
+  { value: "master", label: "臻品母带", format: "flac", bitrate: 0, vip: true },
+  { value: "atmos_51", label: "全景声 5.1", format: "flac", bitrate: 0, vip: true },
+  { value: "atmos", label: "全景声 2.0", format: "flac", bitrate: 0, vip: true },
+  { value: "spatial", label: "空间音频", format: "m4a", bitrate: 0, vip: true },
+  { value: "hires", label: "Hi-Res 无损", format: "flac", bitrate: 0, vip: true },
+  { value: "lossless", label: "无损音质", format: "flac", bitrate: 0, vip: true },
+  { value: "ultra", label: "超高品质", format: "ogg", bitrate: 640, vip: true },
+  { value: "high", label: "高品质", format: "mp3", bitrate: 320, vip: false },
+  { value: "higher", label: "较高品质", format: "mp3", bitrate: 192, vip: false },
+  { value: "standard", label: "标准音质", format: "mp3", bitrate: 128, vip: false },
+  { value: "low", label: "低品质", format: "mp3", bitrate: 64, vip: false },
+  { value: "preview", label: "试听片段", format: "m4a", bitrate: 0, vip: false },
+]);
+const AUDIO_QUALITY_SOURCES = Object.freeze([
+  "qq",
+  "netease",
+  "kugou",
+  "kuwo",
+  "migu",
+  "soda",
+  "qianqian",
+  "apple",
+]);
+const AUDIO_QUALITY_SOURCE_LABELS = Object.freeze({
+  qq: "QQ 音乐",
+  netease: "网易云音乐",
+  kugou: "酷狗音乐",
+  kuwo: "酷我音乐",
+  migu: "咪咕音乐",
+  soda: "汽水音乐",
+  qianqian: "千千音乐",
+  apple: "Apple Music",
+});
 const OPEN_CONFIG_QUERY = "open_config";
 const SCHEDULED_PLAYBACK_STORAGE_KEY = "musicdl:scheduledStop";
 const SCHEDULED_PLAYBACK_LEGACY_STORAGE_KEY = "musicdl:scheduledPlayback";
@@ -41,10 +76,16 @@ const GITHUB_PROXY_PRESETS = [
 const DEFAULT_SHORTCUT_PLAY_PAUSE = "Space";
 const DEFAULT_LYRIC_FONT_FAMILY = "system";
 const DEFAULT_LYRIC_FONT_SIZE = 24;
+const DEFAULT_THEME_MODE = "light";
+const DEFAULT_ACCENT_COLOR = "#10b981";
+const DEFAULT_LYRIC_HIGHLIGHT_COLOR = "#10b981";
+const SYSTEM_THEME_QUERY = window.matchMedia
+  ? window.matchMedia("(prefers-color-scheme: dark)")
+  : null;
 const LYRIC_FONT_FAMILIES = Object.freeze({
   system:
-    '-apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif',
-  sans: '"Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif',
+    '"Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "PingFang SC", -apple-system, BlinkMacSystemFont, sans-serif',
+  sans: '"Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "PingFang SC", sans-serif',
   serif: '"Songti SC", SimSun, "Noto Serif CJK SC", serif',
   yahei: '"Microsoft YaHei", "PingFang SC", sans-serif',
   pingfang: '"PingFang SC", "Microsoft YaHei", sans-serif',
@@ -65,6 +106,8 @@ let webSettings = {
   downloadDir: "data/downloads",
   downloadFilenameTemplate: "{name} - {artist}",
   downloadTipDuration: DEFAULT_DOWNLOAD_TIP_DURATION,
+  defaultAudioQuality: DEFAULT_AUDIO_QUALITY,
+  audioQualityDefaults: {},
   webdavEnabled: false,
   webdavUrl: "",
   webdavUsername: "",
@@ -98,7 +141,15 @@ let webSettings = {
   shortcutSeekForward: "",
   lyricFontFamily: DEFAULT_LYRIC_FONT_FAMILY,
   lyricFontSize: DEFAULT_LYRIC_FONT_SIZE,
+  themeMode: DEFAULT_THEME_MODE,
+  accentColor: DEFAULT_ACCENT_COLOR,
+  lyricHighlightColor: DEFAULT_LYRIC_HIGHLIGHT_COLOR,
 };
+
+let appearancePreviewSettings = null;
+let audioQualityChoices = {};
+let audioQualityOptions = {};
+let audioQualityWarnings = {};
 
 function normalizeWebSettings(raw) {
   const next = {
@@ -108,6 +159,8 @@ function normalizeWebSettings(raw) {
     downloadDir: "data/downloads",
     downloadFilenameTemplate: "{name} - {artist}",
     downloadTipDuration: DEFAULT_DOWNLOAD_TIP_DURATION,
+    defaultAudioQuality: DEFAULT_AUDIO_QUALITY,
+    audioQualityDefaults: {},
     webdavEnabled: false,
     webdavUrl: "",
     webdavUsername: "",
@@ -141,6 +194,9 @@ function normalizeWebSettings(raw) {
     shortcutSeekForward: "",
     lyricFontFamily: DEFAULT_LYRIC_FONT_FAMILY,
     lyricFontSize: DEFAULT_LYRIC_FONT_SIZE,
+    themeMode: DEFAULT_THEME_MODE,
+    accentColor: DEFAULT_ACCENT_COLOR,
+    lyricHighlightColor: DEFAULT_LYRIC_HIGHLIGHT_COLOR,
   };
 
   if (!raw || typeof raw !== "object") {
@@ -167,6 +223,18 @@ function normalizeWebSettings(raw) {
     raw.downloadTipDuration > 0
   ) {
     next.downloadTipDuration = Math.min(raw.downloadTipDuration, 60);
+  }
+  if (typeof raw.defaultAudioQuality === "string") {
+    next.defaultAudioQuality = normalizeAudioQuality(raw.defaultAudioQuality);
+  }
+  if (
+    raw.audioQualityDefaults &&
+    typeof raw.audioQualityDefaults === "object" &&
+    !Array.isArray(raw.audioQualityDefaults)
+  ) {
+    next.audioQualityDefaults = normalizeAudioQualityDefaults(
+      raw.audioQualityDefaults,
+    );
   }
   if (typeof raw.webdavEnabled === "boolean") {
     next.webdavEnabled = raw.webdavEnabled;
@@ -279,7 +347,310 @@ function normalizeWebSettings(raw) {
   if (Number.isInteger(raw.lyricFontSize)) {
     next.lyricFontSize = Math.max(14, Math.min(48, raw.lyricFontSize));
   }
+  next.themeMode = normalizeThemeMode(raw.themeMode);
+  next.accentColor = normalizeWebColor(
+    raw.accentColor,
+    DEFAULT_ACCENT_COLOR,
+  );
+  next.lyricHighlightColor = normalizeWebColor(
+    raw.lyricHighlightColor,
+    DEFAULT_LYRIC_HIGHLIGHT_COLOR,
+  );
   return next;
+}
+
+function canonicalAudioQuality(value) {
+  switch (String(value || "").trim().toLowerCase()) {
+    case "":
+      return "";
+    case "auto":
+      return "auto";
+    case "preview":
+    case "sample":
+    case "trial":
+    case "try":
+      return "preview";
+    case "low":
+    case "64":
+    case "64k":
+    case "lq":
+      return "low";
+    case "standard":
+    case "128":
+    case "128k":
+    case "m500":
+      return "standard";
+    case "higher":
+    case "192":
+    case "192k":
+    case "medium":
+      return "higher";
+    case "high":
+    case "320":
+    case "320k":
+    case "m800":
+      return "high";
+    case "hires":
+    case "hi_res":
+    case "hi-res":
+    case "24bit":
+    case "sq":
+    case "zq":
+    case "zq24":
+      return "hires";
+    case "lossless":
+    case "flac":
+    case "f000":
+      return "lossless";
+    case "ultra":
+    case "640":
+    case "640k":
+    case "ogg":
+    case "o801":
+      return "ultra";
+    case "atmos":
+    case "q000":
+      return "atmos";
+    case "spatial":
+      return "spatial";
+    case "atmos_51":
+    case "spatial_51":
+    case "5.1":
+    case "q001":
+      return "atmos_51";
+    case "master":
+    case "ai00":
+      return "master";
+    default:
+      return "";
+  }
+}
+
+function normalizeAudioQuality(value) {
+  return canonicalAudioQuality(value) || DEFAULT_AUDIO_QUALITY;
+}
+
+function normalizeAudioQualityDefaults(raw) {
+  const defaults = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return defaults;
+  for (const [source, value] of Object.entries(raw)) {
+    const sourceKey = String(source || "")
+      .trim()
+      .toLowerCase();
+    const quality = canonicalAudioQuality(value);
+    if (sourceKey && quality) defaults[sourceKey] = quality;
+  }
+  return defaults;
+}
+
+function normalizeAudioQualityOptions(raw) {
+  if (!Array.isArray(raw)) return null;
+  const allowed = new Set([
+    "auto",
+    "preview",
+    "low",
+    "standard",
+    "higher",
+    "high",
+    "lossless",
+    "hires",
+    "ultra",
+    "spatial",
+    "atmos",
+    "atmos_51",
+    "master",
+  ]);
+  const options = [];
+  const seen = new Set();
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const value = String(item.value || "").trim().toLowerCase();
+    if (!allowed.has(value) || seen.has(value)) continue;
+    seen.add(value);
+    options.push({
+      value,
+      label: String(item.label || value),
+      format: String(item.format || ""),
+      bitrate: Number.isFinite(item.bitrate) ? item.bitrate : 0,
+      vip: item.vip === true,
+    });
+  }
+  return options;
+}
+
+function applyAudioQualityRuntimeOptions(payload) {
+  if (!payload || typeof payload !== "object") return;
+  if (
+    payload.audioQualityChoices &&
+    typeof payload.audioQualityChoices === "object"
+  ) {
+    const nextChoices = {};
+    for (const [rawSource, rawOptions] of Object.entries(
+      payload.audioQualityChoices,
+    )) {
+      const source = String(rawSource || "")
+        .trim()
+        .toLowerCase();
+      const options = normalizeAudioQualityOptions(rawOptions);
+      if (source && options) {
+        nextChoices[source] = options;
+      }
+    }
+    audioQualityChoices = nextChoices;
+  }
+  if (
+    payload.audioQualityOptions &&
+    typeof payload.audioQualityOptions === "object"
+  ) {
+    const nextOptions = {};
+    for (const [source, rawOptions] of Object.entries(
+      payload.audioQualityOptions,
+    )) {
+      const sourceKey = String(source || "")
+        .trim()
+        .toLowerCase();
+      const options = normalizeAudioQualityOptions(rawOptions);
+      if (sourceKey && options) {
+        nextOptions[sourceKey] = options;
+      }
+    }
+    audioQualityOptions = nextOptions;
+  }
+  audioQualityWarnings =
+    payload.audioQualityWarnings &&
+    typeof payload.audioQualityWarnings === "object"
+      ? {...payload.audioQualityWarnings}
+      : {};
+}
+
+function audioQualityOptionText(option) {
+  const labelHasBitrate =
+    option.bitrate > 0 &&
+    new RegExp(`(^|\\D)${option.bitrate}\\s*k`, "i").test(option.label);
+  return (
+    option.label +
+    (option.format ? ` · ${option.format.toUpperCase()}` : "") +
+    (option.bitrate && !labelHasBitrate ? ` · ${option.bitrate} kbps` : "")
+  );
+}
+
+function populateAudioQualityDefaults(preferred) {
+  const container = document.getElementById("setting-audio-quality-sources");
+  const preferredDefaults = normalizeAudioQualityDefaults(preferred);
+  const currentDefaults = normalizeAudioQualityDefaults(
+    webSettings.audioQualityDefaults,
+  );
+  const extraSources = [
+    ...new Set([
+      ...Object.keys(audioQualityChoices),
+      ...Object.keys(audioQualityOptions),
+    ]),
+  ].filter((source) => !AUDIO_QUALITY_SOURCES.includes(source));
+  const result = {};
+  if (!container) return {...currentDefaults, ...preferredDefaults};
+
+  container.replaceChildren();
+  for (const source of [...AUDIO_QUALITY_SOURCES, ...extraSources]) {
+    const hasRuntimeChoices = Object.prototype.hasOwnProperty.call(
+      audioQualityChoices,
+      source,
+    );
+    const hasRuntimeOptions = Object.prototype.hasOwnProperty.call(
+      audioQualityOptions,
+      source,
+    );
+    const availableOptions = hasRuntimeOptions
+      ? audioQualityOptions[source] || []
+      : [];
+    let choices = hasRuntimeChoices ? audioQualityChoices[source] || [] : [];
+    if (!choices.length && availableOptions.length) {
+      choices = availableOptions;
+    }
+    if (!choices.length && !hasRuntimeChoices) {
+      choices = DEFAULT_AUDIO_QUALITY_OPTIONS.filter(
+        (option) =>
+          option.value === "high" || option.value === "standard",
+      );
+    }
+
+    const row = document.createElement("div");
+    row.className = "audio-quality-source-row";
+    const label = document.createElement("strong");
+    label.className = "audio-quality-source-label";
+    label.textContent = AUDIO_QUALITY_SOURCE_LABELS[source] || source;
+    row.appendChild(label);
+
+    const group = document.createElement("div");
+    group.id = `setting-audio-quality-${source}`;
+    group.className = "audio-quality-choice-group";
+    group.setAttribute("role", "radiogroup");
+    group.setAttribute(
+      "aria-label",
+      `${AUDIO_QUALITY_SOURCE_LABELS[source] || source}默认音质`,
+    );
+    group.setAttribute(
+      "aria-describedby",
+      "setting-default-audio-quality-hint",
+    );
+    const availableValues = new Set(
+      availableOptions.map((option) => option.value),
+    );
+    const requested = normalizeAudioQuality(
+      preferredDefaults[source] ||
+        currentDefaults[source] ||
+        webSettings.defaultAudioQuality ||
+        DEFAULT_AUDIO_QUALITY,
+    );
+    const selectedValue = availableValues.has(requested)
+      ? requested
+      : availableValues.has(DEFAULT_AUDIO_QUALITY)
+        ? DEFAULT_AUDIO_QUALITY
+        : availableOptions[0]?.value || "";
+    if (selectedValue) result[source] = selectedValue;
+
+    for (const option of choices) {
+      const available = availableValues.has(option.value);
+      const choice = document.createElement("label");
+      choice.className = "audio-quality-choice";
+      choice.classList.toggle("is-disabled", !available);
+      choice.title = available
+        ? audioQualityOptionText(option)
+        : `${audioQualityOptionText(option)}（当前 Cookie 不可用）`;
+
+      const input = document.createElement("input");
+      input.type = "radio";
+      input.name = `setting-audio-quality-${source}`;
+      input.value = option.value;
+      input.dataset.audioQualitySource = source;
+      input.dataset.audioQualityValue = option.value;
+      input.checked = available && option.value === selectedValue;
+      input.disabled = !available;
+
+      const text = document.createElement("span");
+      text.textContent = audioQualityOptionText(option);
+      choice.append(input, text);
+      group.appendChild(choice);
+    }
+    row.appendChild(group);
+    if (!availableOptions.length) {
+      const empty = document.createElement("span");
+      empty.className = "audio-quality-source-empty";
+      empty.textContent = "当前 Cookie 无可播放音质";
+      row.appendChild(empty);
+    }
+    container.appendChild(row);
+  }
+  const hint = document.getElementById("setting-default-audio-quality-hint");
+  if (hint) {
+    const warnings = Object.entries(audioQualityWarnings).map(
+      ([source, warning]) =>
+        `${AUDIO_QUALITY_SOURCE_LABELS[source] || source}：${warning}`,
+    );
+    hint.textContent = warnings.length
+      ? `部分平台暂时无法刷新：${warnings.join("；")}`
+      : "全部音质档位始终显示；灰色档位表示当前 Cookie 不可用。单曲缺少所选档位时会自动向下回退到可播放档位。";
+  }
+  return result;
 }
 
 function loadWebSettingsFromCache() {
@@ -585,6 +956,233 @@ function normalizeLyricFontSize(value) {
   return Math.max(14, Math.min(48, size));
 }
 
+function normalizeThemeMode(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return ["light", "dark", "system"].includes(normalized)
+    ? normalized
+    : DEFAULT_THEME_MODE;
+}
+
+function normalizeWebColor(value, fallback) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return /^#[0-9a-f]{6}$/.test(normalized) ? normalized : fallback;
+}
+
+function resolvedThemeMode() {
+  const mode = normalizeThemeMode(webSettings.themeMode);
+  if (mode !== "system") return mode;
+  return SYSTEM_THEME_QUERY?.matches ? "dark" : "light";
+}
+
+function applyThemeAppearance(appearance = webSettings) {
+  const root = document.documentElement;
+  const accent = normalizeWebColor(
+    appearance.accentColor,
+    DEFAULT_ACCENT_COLOR,
+  );
+  const lyricHighlight = normalizeWebColor(
+    appearance.lyricHighlightColor,
+    DEFAULT_LYRIC_HIGHLIGHT_COLOR,
+  );
+  const themeMode = normalizeThemeMode(appearance.themeMode);
+  const theme =
+    themeMode === "system"
+      ? SYSTEM_THEME_QUERY?.matches
+        ? "dark"
+        : "light"
+      : themeMode;
+  const rgb = [1, 3, 5].map((offset) =>
+    Number.parseInt(accent.slice(offset, offset + 2), 16),
+  );
+  const strongRGB = rgb.map((channel) => Math.round(channel * 0.82));
+  const deepRGB = rgb.map((channel) => Math.round(channel * 0.7));
+  const lightRGB = rgb.map((channel) => Math.round(channel + (255 - channel) * 0.24));
+
+  root.dataset.theme = theme;
+  root.dataset.themeMode = themeMode;
+  root.style.colorScheme = theme;
+  root.style.setProperty("--primary-color", accent);
+  root.style.setProperty("--primary-rgb", rgb.join(", "));
+  root.style.setProperty("--primary-strong-rgb", strongRGB.join(", "));
+  root.style.setProperty("--primary-deep-rgb", deepRGB.join(", "));
+  root.style.setProperty("--primary-light-rgb", lightRGB.join(", "));
+  root.style.setProperty(
+    "--primary-strong",
+    `color-mix(in srgb, ${accent} 82%, #000)`,
+  );
+  root.style.setProperty(
+    "--primary-deep",
+    `color-mix(in srgb, ${accent} 70%, #000)`,
+  );
+  root.style.setProperty(
+    "--primary-light",
+    `color-mix(in srgb, ${accent} 76%, #fff)`,
+  );
+  root.style.setProperty(
+    "--primary-soft",
+    `color-mix(in srgb, ${accent} 18%, #fff)`,
+  );
+  root.style.setProperty(
+    "--primary-faint",
+    `color-mix(in srgb, ${accent} 8%, #fff)`,
+  );
+  root.style.setProperty(
+    "--primary-border",
+    `color-mix(in srgb, ${accent} 34%, #fff)`,
+  );
+  root.style.setProperty(
+    "--primary-gradient",
+    `linear-gradient(135deg, color-mix(in srgb, ${accent} 72%, #fff) 0%, color-mix(in srgb, ${accent} 88%, #000) 100%)`,
+  );
+  root.style.setProperty("--lyric-highlight-color", lyricHighlight);
+
+  document
+    .querySelectorAll(
+      ".aplayer-played, .aplayer-thumb, .aplayer-volume, .aplayer-list-cur",
+    )
+    .forEach((element) => {
+      element.style.background = accent;
+    });
+  document.querySelectorAll(".aplayer-pic").forEach((element) => {
+    if (!element.style.backgroundImage || element.style.backgroundImage === "none") {
+      element.style.backgroundColor = accent;
+    }
+  });
+}
+
+function syncAppearanceControls(appearance = webSettings) {
+  const themeInput = document.getElementById("setting-theme-mode");
+  const accentInput = document.getElementById("setting-accent-color");
+  const lyricColorInput = document.getElementById(
+    "setting-lyric-highlight-color",
+  );
+  const accentValue = document.getElementById("setting-accent-color-value");
+  const lyricColorValue = document.getElementById(
+    "setting-lyric-highlight-color-value",
+  );
+  const themeMode = normalizeThemeMode(appearance.themeMode);
+  const accent = normalizeWebColor(
+    appearance.accentColor,
+    DEFAULT_ACCENT_COLOR,
+  );
+  const lyricHighlight = normalizeWebColor(
+    appearance.lyricHighlightColor,
+    DEFAULT_LYRIC_HIGHLIGHT_COLOR,
+  );
+
+  if (themeInput) themeInput.value = themeMode;
+  if (accentInput) accentInput.value = accent;
+  if (lyricColorInput) lyricColorInput.value = lyricHighlight;
+  if (accentValue) accentValue.textContent = accent;
+  if (lyricColorValue) lyricColorValue.textContent = lyricHighlight;
+  document.querySelectorAll("[data-accent-preset]").forEach((button) => {
+    const selected =
+      normalizeWebColor(button.dataset.accentPreset, "") === accent;
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  });
+}
+
+function appearanceSnapshot(settings = webSettings) {
+  return {
+    themeMode: normalizeThemeMode(settings.themeMode),
+    accentColor: normalizeWebColor(
+      settings.accentColor,
+      DEFAULT_ACCENT_COLOR,
+    ),
+    lyricHighlightColor: normalizeWebColor(
+      settings.lyricHighlightColor,
+      DEFAULT_LYRIC_HIGHLIGHT_COLOR,
+    ),
+  };
+}
+
+function beginAppearancePreview(settings = webSettings) {
+  appearancePreviewSettings = appearanceSnapshot(settings);
+  applyThemeAppearance(appearancePreviewSettings);
+  syncAppearanceControls(appearancePreviewSettings);
+}
+
+function updateAppearancePreview(patch) {
+  appearancePreviewSettings = appearanceSnapshot({
+    ...(appearancePreviewSettings || webSettings),
+    ...patch,
+  });
+  applyThemeAppearance(appearancePreviewSettings);
+  syncAppearanceControls(appearancePreviewSettings);
+}
+
+function endAppearancePreview() {
+  appearancePreviewSettings = null;
+  applyThemeAppearance(webSettings);
+  syncAppearanceControls(webSettings);
+}
+
+function bindAppearanceSettingEvents() {
+  const themeInput = document.getElementById("setting-theme-mode");
+  const accentInput = document.getElementById("setting-accent-color");
+  const lyricColorInput = document.getElementById(
+    "setting-lyric-highlight-color",
+  );
+
+  if (themeInput && themeInput.dataset.bound !== "1") {
+    themeInput.dataset.bound = "1";
+    themeInput.addEventListener("change", () => {
+      updateAppearancePreview({
+        themeMode: normalizeThemeMode(themeInput.value),
+      });
+    });
+  }
+  if (accentInput && accentInput.dataset.bound !== "1") {
+    accentInput.dataset.bound = "1";
+    accentInput.addEventListener("input", () => {
+      updateAppearancePreview({
+        accentColor: normalizeWebColor(
+          accentInput.value,
+          DEFAULT_ACCENT_COLOR,
+        ),
+      });
+    });
+  }
+  if (lyricColorInput && lyricColorInput.dataset.bound !== "1") {
+    lyricColorInput.dataset.bound = "1";
+    lyricColorInput.addEventListener("input", () => {
+      updateAppearancePreview({
+        lyricHighlightColor: normalizeWebColor(
+          lyricColorInput.value,
+          DEFAULT_LYRIC_HIGHLIGHT_COLOR,
+        ),
+      });
+    });
+  }
+  document.querySelectorAll("[data-accent-preset]").forEach((button) => {
+    if (button.dataset.bound === "1") return;
+    button.dataset.bound = "1";
+    button.addEventListener("click", () => {
+      const accent = normalizeWebColor(
+        button.dataset.accentPreset,
+        DEFAULT_ACCENT_COLOR,
+      );
+      if (accentInput) accentInput.value = accent;
+      updateAppearancePreview({ accentColor: accent });
+    });
+  });
+  if (!document.documentElement.dataset.systemThemeBound && SYSTEM_THEME_QUERY) {
+    document.documentElement.dataset.systemThemeBound = "1";
+    const handleSystemThemeChange = () => {
+      const appearance = appearancePreviewSettings || webSettings;
+      if (normalizeThemeMode(appearance.themeMode) === "system") {
+        applyThemeAppearance(appearance);
+      }
+    };
+    if (typeof SYSTEM_THEME_QUERY.addEventListener === "function") {
+      SYSTEM_THEME_QUERY.addEventListener("change", handleSystemThemeChange);
+    } else if (typeof SYSTEM_THEME_QUERY.addListener === "function") {
+      SYSTEM_THEME_QUERY.addListener(handleSystemThemeChange);
+    }
+  }
+}
+
 function lyricFontCSSValue(family) {
   return (
     LYRIC_FONT_FAMILIES[normalizeLyricFontFamily(family)] ||
@@ -597,6 +1195,7 @@ function applyLyricAppearance() {
   const size = normalizeLyricFontSize(webSettings.lyricFontSize);
   document.documentElement.style.setProperty("--lyric-font-family", family);
   document.documentElement.style.setProperty("--lyric-font-size", `${size}px`);
+  applyThemeAppearance();
 }
 
 function updateLyricFontPreview(family, size) {
@@ -747,10 +1346,28 @@ function readPlaybackShortcutSettingsFromForm() {
   return settings;
 }
 
+function readAudioQualityDefaultsFromForm() {
+  const defaults = {};
+  document
+    .querySelectorAll(
+      'input[type="radio"][data-audio-quality-source]:checked:not(:disabled)',
+    )
+    .forEach((input) => {
+      const source = String(input.dataset.audioQualitySource || "")
+        .trim()
+        .toLowerCase();
+      const quality = canonicalAudioQuality(input.value);
+      if (source && quality) defaults[source] = quality;
+    });
+  return defaults;
+}
+
 function applyWebSettings(settings) {
   const wasAutoSwitchInvalidSourcesEnabled =
     isAutoSwitchInvalidSourcesEnabled();
+  applyAudioQualityRuntimeOptions(settings);
   webSettings = normalizeWebSettings(settings);
+  appearancePreviewSettings = null;
   persistWebSettingsCache();
 
   const embedToggle = document.getElementById("setting-embed-download");
@@ -763,6 +1380,9 @@ function applyWebSettings(settings) {
   if (downloadLyricsToggle) {
     downloadLyricsToggle.checked = webSettings.downloadLyricsToLocal;
   }
+  webSettings.audioQualityDefaults = populateAudioQualityDefaults(
+    webSettings.audioQualityDefaults,
+  );
 
   const webdavEnabledToggle = document.getElementById(
     "setting-webdav-enabled",
@@ -844,6 +1464,9 @@ function applyWebSettings(settings) {
   }
   bindLyricFontSettingEvents();
   syncLyricAppearanceControls();
+  bindAppearanceSettingEvents();
+  syncAppearanceControls();
+  applyThemeAppearance();
   bindPlaybackShortcutSettingEvents();
   syncPlaybackShortcutControls();
 
@@ -1622,7 +2245,10 @@ function ensureSongActionFold(card) {
   }
 
   Array.from(actions.children).forEach((action) => {
-    if (action.classList.contains("btn-dl")) {
+    if (
+      action.classList.contains("btn-dl") &&
+      !action.classList.contains("btn-primary-download")
+    ) {
       moreActions.appendChild(action);
     }
   });
@@ -1965,8 +2591,162 @@ function syncRightToolbar(nextDoc, currentContainer) {
   } else if (currentContainer) {
     currentContainer.before(nextToolbar.cloneNode(true));
   }
+  initializeRightToolbar();
   bindAuthFloat();
   refreshAuthFloat();
+}
+
+const RIGHT_TOOLBAR_STORAGE_KEY = "musicdl:rightToolbar";
+const rightToolbarMobileMedia = window.matchMedia("(max-width: 768px)");
+
+function readRightToolbarPreference() {
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem(RIGHT_TOOLBAR_STORAGE_KEY) || "null",
+    );
+    return saved && typeof saved === "object" ? saved : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function persistRightToolbarPreference(toolbar, patch = {}) {
+  const previous = readRightToolbarPreference();
+  const next = {
+    ...previous,
+    collapsed: toolbar.classList.contains("is-collapsed"),
+    top: Number.parseFloat(toolbar.style.getPropertyValue("--rt-mobile-top")) || null,
+    ...patch,
+  };
+  try {
+    localStorage.setItem(RIGHT_TOOLBAR_STORAGE_KEY, JSON.stringify(next));
+  } catch (_) {}
+}
+
+function setRightToolbarCollapsed(toolbar, collapsed) {
+  if (!toolbar) return;
+  toolbar.classList.toggle("is-collapsed", Boolean(collapsed));
+  const toggle = toolbar.querySelector(".right-toolbar-toggle");
+  if (!toggle) return;
+  toggle.setAttribute("aria-expanded", String(!collapsed));
+  const label = collapsed
+    ? "展开侧边工具栏（可拖动调整位置）"
+    : "折叠侧边工具栏（可拖动调整位置）";
+  toggle.title = label;
+  toggle.setAttribute("aria-label", label);
+  const icon = toggle.querySelector("i");
+  if (icon) {
+    icon.classList.toggle("fa-chevron-left", Boolean(collapsed));
+    icon.classList.toggle("fa-chevron-right", !collapsed);
+  }
+}
+
+function clampRightToolbarTop(value) {
+  const min = 84;
+  const max = Math.max(min, window.innerHeight - 84);
+  return Math.min(max, Math.max(min, Number(value) || window.innerHeight / 2));
+}
+
+function initializeRightToolbar() {
+  const toolbar = document.querySelector(".right-toolbar");
+  const toggle = toolbar?.querySelector(".right-toolbar-toggle");
+  if (!toolbar || !toggle) return;
+
+  const saved = readRightToolbarPreference();
+  if (Number.isFinite(Number(saved.top))) {
+    toolbar.style.setProperty(
+      "--rt-mobile-top",
+      String(clampRightToolbarTop(saved.top)) + "px",
+    );
+  }
+  const collapsed = rightToolbarMobileMedia.matches
+    ? typeof saved.collapsed === "boolean"
+      ? saved.collapsed
+      : true
+    : false;
+  setRightToolbarCollapsed(toolbar, collapsed);
+  if (toggle.dataset.toolbarBound === "1") return;
+  toggle.dataset.toolbarBound = "1";
+
+  let drag = null;
+  let suppressToggleClickUntil = 0;
+  toggle.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    const rect = toolbar.getBoundingClientRect();
+    drag = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startedTop: rect.top + rect.height / 2,
+      moved: false,
+    };
+    toggle.setPointerCapture?.(event.pointerId);
+    event.stopPropagation();
+  });
+
+  toggle.addEventListener("pointermove", (event) => {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const delta = event.clientY - drag.startY;
+    if (!drag.moved && Math.abs(delta) < 5) return;
+    drag.moved = true;
+    event.preventDefault();
+    toolbar.classList.add("is-dragging");
+    toolbar.style.setProperty(
+      "--rt-mobile-top",
+      String(clampRightToolbarTop(drag.startedTop + delta)) + "px",
+    );
+  });
+
+  const finishDrag = (event, cancelled = false) => {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const wasMoved = drag.moved;
+    drag = null;
+    toolbar.classList.remove("is-dragging");
+    if (toggle.hasPointerCapture?.(event.pointerId)) {
+      toggle.releasePointerCapture(event.pointerId);
+    }
+    if (!cancelled && wasMoved) {
+      // Do not change layout during pointerup. On touch devices the browser can
+      // retarget the compatibility click after the toolbar recenters, which
+      // makes a collapse gesture activate whichever page button moves under it.
+      suppressToggleClickUntil = performance.now() + 500;
+    }
+    persistRightToolbarPreference(toolbar);
+  };
+
+  toggle.addEventListener("pointerup", (event) => finishDrag(event));
+  toggle.addEventListener("pointercancel", (event) =>
+    finishDrag(event, true),
+  );
+  toggle.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (performance.now() < suppressToggleClickUntil) return;
+    setRightToolbarCollapsed(
+      toolbar,
+      !toolbar.classList.contains("is-collapsed"),
+    );
+    persistRightToolbarPreference(toolbar);
+  });
+}
+
+const handleRightToolbarViewportChange = () => {
+  const toolbar = document.querySelector(".right-toolbar");
+  if (!toolbar) return;
+  if (!rightToolbarMobileMedia.matches) {
+    setRightToolbarCollapsed(toolbar, false);
+    return;
+  }
+  const saved = readRightToolbarPreference();
+  setRightToolbarCollapsed(toolbar, saved.collapsed !== false);
+};
+
+if (typeof rightToolbarMobileMedia.addEventListener === "function") {
+  rightToolbarMobileMedia.addEventListener(
+    "change",
+    handleRightToolbarViewportChange,
+  );
+} else {
+  rightToolbarMobileMedia.addListener(handleRightToolbarViewportChange);
 }
 
 // 结果区顶部至少要有这么多像素可见，才认为用户已经能看到搜索结果。
@@ -2852,6 +3632,7 @@ document.addEventListener("DOMContentLoaded", function () {
   initializeTVMode();
   loadWebSettingsFromCache();
   applyWebSettings(webSettings);
+  initializeRightToolbar();
   bindSettingsTabs();
   bindAuthFloat();
   refreshAuthFloat();
@@ -3711,7 +4492,7 @@ function showDuplicateModal(groups, loading, pagination = {}) {
               url: buildStreamURL(s.id, "local", s.name, s.artist, "", "", ""),
               cover: "",
               lrc: "",
-              theme: "#10b981",
+              theme: webSettings.accentColor,
               custom_id: s.id,
               source: "local",
               duration: s.duration || 0,
@@ -5324,11 +6105,11 @@ async function loadDownloadRecordsPage(page = 1) {
       const errHint = r.Error ? ` title="${escapeHtml(r.Error)}"` : "";
       const time = r.CreatedAt ? new Date(r.CreatedAt).toLocaleString() : "";
       html += `<tr${errHint}>
-        <td><div class="download-record-name">${escapeHtml(r.Name || "")}</div></td>
-        <td><div class="download-record-artist">${escapeHtml(r.Artist || "")}</div></td>
-        <td><span class="download-record-source">${escapeHtml(r.Source || "")}</span></td>
+        <td><div class="download-record-name" title="${escapeHtml(r.Name || "")}">${escapeHtml(r.Name || "")}</div></td>
+        <td><div class="download-record-artist" title="${escapeHtml(r.Artist || "")}">${escapeHtml(r.Artist || "")}</div></td>
+        <td><span class="download-record-source" title="${escapeHtml(r.Source || "")}">${escapeHtml(r.Source || "")}</span></td>
         <td><span class="download-record-status ${status.className}"><i class="fa-solid ${status.icon}"></i>${status.label}</span></td>
-        <td class="download-record-time">${escapeHtml(time)}</td>
+        <td class="download-record-time" title="${escapeHtml(time)}">${escapeHtml(time)}</td>
       </tr>`;
     }
 
@@ -5545,7 +6326,7 @@ function playPlaybackHistoryItem(index) {
     cover: song.cover,
     lrc: lyricURLs.line,
     raw_lrc: lyricURLs.auto,
-    theme: "#10b981",
+    theme: normalizeWebColor(webSettings.accentColor, DEFAULT_ACCENT_COLOR),
     custom_id: song.id,
     source: song.source,
     duration: song.duration,
@@ -5675,20 +6456,66 @@ async function openLatestUpdatePage(target = "download") {
   openClientExternalURL(url, popup);
 }
 
+let systemConfigLoadSequence = 0;
+let systemConfigLoadController = null;
+
+function setSystemConfigLoading(loading) {
+  const modal = document.getElementById("cookieModal");
+  const saveButton = document.getElementById("settings-save-button");
+  if (modal) {
+    modal.setAttribute("aria-busy", String(loading));
+  }
+  if (!saveButton) return;
+  saveButton.disabled = loading;
+  saveButton.setAttribute("aria-busy", String(loading));
+  saveButton.textContent = loading ? "正在加载设置..." : "保存设置";
+}
+
+function closeSystemConfig() {
+  systemConfigLoadController?.abort();
+  systemConfigLoadController = null;
+  systemConfigLoadSequence++;
+  endAppearancePreview();
+  const modal = document.getElementById("cookieModal");
+  if (modal) modal.style.display = "none";
+  setSystemConfigLoading(false);
+}
+
 async function openSystemConfig(initialTab = "general") {
   const modal = document.getElementById("cookieModal");
+  const requestSequence = ++systemConfigLoadSequence;
+  systemConfigLoadController?.abort();
+  const controller = new AbortController();
+  systemConfigLoadController = controller;
+
+  // Open from the cached settings immediately. Auto source switching can keep
+  // the same-origin request slots busy, but it must not delay this dialog.
+  if (modal) modal.style.display = "flex";
+  beginAppearancePreview(webSettings);
+  bindSettingsTabs();
+  setSettingsTab(initialTab);
+  setSystemConfigLoading(true);
+
   try {
     const [cookiesResponse, settingsResponse] = await Promise.all([
-      fetch(API_ROOT + "/cookies", { headers: { Accept: "application/json" } }),
-      fetch(API_ROOT + "/settings"),
+      fetch(API_ROOT + "/cookies", {
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      }),
+      fetch(API_ROOT + "/settings", { signal: controller.signal }),
     ]);
     const cookies = await cookiesResponse.json().catch(() => null);
     const settings = await settingsResponse.json().catch(() => null);
-    if (handleConfigAuthResponse(cookiesResponse, cookies)) return;
+    if (requestSequence !== systemConfigLoadSequence) return;
+    if (handleConfigAuthResponse(cookiesResponse, cookies)) {
+      closeSystemConfig();
+      return;
+    }
     if (!cookiesResponse.ok || !settingsResponse.ok) {
       throw new Error("加载系统配置失败");
     }
     applyWebSettings(settings);
+    beginAppearancePreview(webSettings);
     for (const [k, v] of Object.entries(cookies || {})) {
       const el = document.getElementById(`cookie-${k}`);
       if (el) el.value = v;
@@ -5696,10 +6523,20 @@ async function openSystemConfig(initialTab = "general") {
     bindSettingsTabs();
     setSettingsTab(initialTab);
     setAuthFloatLoggedIn(true);
-    if (modal) modal.style.display = "flex";
   } catch (error) {
-    applyWebSettings(webSettings);
+    if (
+      requestSequence !== systemConfigLoadSequence ||
+      error?.name === "AbortError"
+    ) {
+      return;
+    }
+    closeSystemConfig();
     showToast("系统配置加载失败", error.message || "请稍后重试", "error");
+  } finally {
+    if (requestSequence === systemConfigLoadSequence) {
+      systemConfigLoadController = null;
+      setSystemConfigLoading(false);
+    }
   }
 }
 
@@ -5732,6 +6569,8 @@ async function saveCookies() {
         document.getElementById("setting-download-tip-duration")?.value,
         DEFAULT_DOWNLOAD_TIP_DURATION,
       ),
+      defaultAudioQuality: normalizeAudioQuality(webSettings.defaultAudioQuality),
+      audioQualityDefaults: readAudioQualityDefaultsFromForm(),
       webdavEnabled: !!document.getElementById("setting-webdav-enabled")
         ?.checked,
       webdavUrl: document.getElementById("setting-webdav-url")?.value || "",
@@ -5793,6 +6632,17 @@ async function saveCookies() {
       lyricFontSize: normalizeLyricFontSize(
         document.getElementById("setting-lyric-font-size")?.value,
       ),
+      themeMode: normalizeThemeMode(
+        document.getElementById("setting-theme-mode")?.value,
+      ),
+      accentColor: normalizeWebColor(
+        document.getElementById("setting-accent-color")?.value,
+        DEFAULT_ACCENT_COLOR,
+      ),
+      lyricHighlightColor: normalizeWebColor(
+        document.getElementById("setting-lyric-highlight-color")?.value,
+        DEFAULT_LYRIC_HIGHLIGHT_COLOR,
+      ),
     });
   } catch (error) {
     setShortcutCaptureStatus(error.message, true);
@@ -5806,24 +6656,46 @@ async function saveCookies() {
   });
 
   try {
-    const [cookiesResponse, settingsResponse] = await Promise.all([
-      fetch(API_ROOT + "/cookies", {
+    const [cookiesResponse, settingsResponse] = await (async () => {
+      const cookiesResponse = await fetch(API_ROOT + "/cookies", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
         body: JSON.stringify(data),
-      }),
-      fetch(API_ROOT + "/settings", {
+      });
+      const cookiesPayload = await cookiesResponse.json().catch(() => null);
+      if (handleConfigAuthResponse(cookiesResponse, cookiesPayload)) {
+        return [cookiesResponse, null];
+      }
+      if (!cookiesResponse.ok) {
+        throw new Error(cookiesPayload?.error || "保存 Cookie 失败，请稍后重试");
+      }
+
+      const qualityResponse = await fetch(API_ROOT + "/settings", {
+        headers: {Accept: "application/json"},
+      });
+      const qualityPayload = await qualityResponse.json().catch(() => null);
+      if (!qualityResponse.ok) {
+        throw new Error(qualityPayload?.error || "读取可用音质失败");
+      }
+      applyAudioQualityRuntimeOptions(qualityPayload);
+      nextSettings.audioQualityDefaults = populateAudioQualityDefaults(
+        nextSettings.audioQualityDefaults,
+      );
+      nextSettings = normalizeWebSettings(nextSettings);
+
+      const settingsResponse = await fetch(API_ROOT + "/settings", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
         body: JSON.stringify(nextSettings),
-      }),
-    ]);
+      });
+      return [cookiesResponse, settingsResponse];
+    })();
     const cookiesPayload = await cookiesResponse.json().catch(() => null);
     const savedSettings = await settingsResponse.json().catch(() => null);
     if (
@@ -5849,7 +6721,7 @@ async function saveCookies() {
     }
     setAuthFloatLoggedIn(true);
     alert("保存成功");
-    document.getElementById("cookieModal").style.display = "none";
+    closeSystemConfig();
   } catch (error) {
     alert(error.message || "保存失败，请稍后重试");
   }
@@ -5995,8 +6867,8 @@ function floatPageNumClick() {
   input.style.textAlign = "center";
   input.style.fontSize = "13px";
   input.style.fontWeight = "700";
-  input.style.color = "#10b981";
-  input.style.border = "2px solid #10b981";
+  input.style.color = webSettings.accentColor;
+  input.style.border = `2px solid ${webSettings.accentColor}`;
   input.style.borderRadius = "6px";
   input.style.outline = "none";
   input.style.background = "white";
@@ -6051,6 +6923,35 @@ function getCurrentAPlayerAudio() {
   const index = ap.list.index;
   if (typeof index !== "number" || index < 0) return null;
   return ap.list.audios[index] || null;
+}
+
+function syncCurrentMediaDuration() {
+  const playerAudio = getCurrentAPlayerAudio();
+  const duration = Number(ap?.audio?.duration);
+  if (
+    !playerAudio ||
+    !Number.isFinite(duration) ||
+    duration <= 0 ||
+    duration > 24 * 60 * 60
+  ) {
+    return;
+  }
+
+  playerAudio.duration = duration;
+  const card = findSongCardById(getPlaybackCardID(playerAudio));
+  if (card) {
+    card.dataset.duration = String(duration);
+    card.dataset.sortDuration = String(Math.round(duration));
+    const tag = card.querySelector(".tag-duration");
+    if (tag) tag.textContent = formatDuration(duration);
+  }
+  if (
+    window.VideoGen?.data &&
+    window.VideoGen.data.id ===
+      String(playerAudio.custom_id || playerAudio.original_id || "")
+  ) {
+    window.VideoGen.data.duration = duration;
+  }
 }
 
 function getPlaybackCardID(audio) {
@@ -6883,7 +7784,7 @@ try {
     container: document.getElementById("aplayer"),
     fixed: true,
     autoplay: false,
-    theme: "#10b981",
+    theme: webSettings.accentColor,
     loop: "all",
     order: "list",
     preload: "metadata",
@@ -6903,6 +7804,10 @@ let scheduledPlaybackTimer = null;
 let scheduledPlaybackTicker = null;
 let scheduledPlaybackTriggering = false;
 let scheduledPlaybackPresetNextAt = 0;
+let scheduledPlaybackEditingPresetMinutes = 0;
+let scheduledPlaybackWaitingForTrackEnd = false;
+let scheduledPlaybackWaitingEndedHandler = null;
+let scheduledPlaybackWaitingTargetAt = 0;
 
 function parseScheduledPlaybackTime(value) {
   const match = String(value || "")
@@ -6935,7 +7840,12 @@ function normalizeScheduledPlayback(raw, now = Date.now()) {
   if (!parsed) return null;
   const nextAt = Number(raw.nextAt);
   if (!Number.isFinite(nextAt) || nextAt <= now) return null;
-  return { time: parsed.time, nextAt };
+  const presetMinutes = Number(raw.presetMinutes);
+  return {
+    time: parsed.time,
+    nextAt,
+    ...([5, 15, 30, 60].includes(presetMinutes) ? { presetMinutes } : {}),
+  };
 }
 
 function readScheduledPlayback() {
@@ -7013,10 +7923,27 @@ function formatScheduledPlaybackBadge(timestamp) {
   return `${totalSeconds}s`;
 }
 
+function syncScheduledPlaybackPresetButtons() {
+  const presetMinutes = Number(
+    scheduledPlaybackEditingPresetMinutes ||
+      scheduledPlayback?.presetMinutes ||
+      0,
+  );
+  document
+    .querySelectorAll("[data-scheduled-playback-minutes]")
+    .forEach((button) => {
+      const selected =
+        Number(button.dataset.scheduledPlaybackMinutes) === presetMinutes;
+      button.setAttribute("aria-pressed", String(selected));
+    });
+}
+
 function updateScheduledPlaybackUI() {
-  const active = Boolean(scheduledPlayback);
+  const waiting = scheduledPlaybackWaitingForTrackEnd;
+  const active = Boolean(scheduledPlayback) || waiting;
   const button = document.getElementById("scheduled-playback-toolbar-button");
   const badge = document.getElementById("scheduled-playback-toolbar-badge");
+  const status = document.querySelector(".scheduled-playback-status");
   const statusTitle = document.getElementById("scheduled-playback-status-title");
   const statusCopy = document.getElementById("scheduled-playback-status-copy");
   const activePanel = document.getElementById("scheduled-playback-active");
@@ -7027,35 +7954,60 @@ function updateScheduledPlaybackUI() {
 
   if (button) {
     button.classList.toggle("is-scheduled", active);
-    const label = active
-      ? `定时停止：${formatScheduledPlaybackDate(
-          scheduledPlayback.nextAt,
-        )}，还有 ${formatScheduledPlaybackCountdown(scheduledPlayback.nextAt)}`
-      : "定时停止";
+    button.classList.toggle("is-waiting", waiting);
+    button.setAttribute("aria-pressed", String(active));
+    const label = waiting
+      ? "定时停止：等待当前歌曲播放结束后暂停"
+      : active
+        ? "定时停止：" +
+          formatScheduledPlaybackDate(scheduledPlayback.nextAt) +
+          "，还有 " +
+          formatScheduledPlaybackCountdown(scheduledPlayback.nextAt)
+        : "定时停止";
     button.title = label;
     button.setAttribute("aria-label", label);
   }
   if (badge) {
     badge.hidden = !active;
-    badge.textContent = active
-      ? formatScheduledPlaybackBadge(scheduledPlayback.nextAt)
-      : "";
+    badge.textContent = waiting
+      ? "等待"
+      : active
+        ? formatScheduledPlaybackBadge(scheduledPlayback.nextAt)
+        : "";
   }
+  status?.classList.toggle("is-waiting", waiting);
   if (statusTitle && statusCopy) {
-    statusTitle.textContent = active ? "已设置定时停止" : "尚未设置定时停止";
-    statusCopy.textContent = active
-      ? `${formatScheduledPlaybackDate(scheduledPlayback.nextAt)}自动暂停播放`
-      : "选择时间后，播放器会在到点时自动暂停，播放清单会保留。";
+    statusTitle.textContent = waiting
+      ? "等待当前歌曲结束"
+      : active
+        ? "已设置定时停止"
+        : "尚未设置定时停止";
+    statusCopy.textContent = waiting
+      ? "定时时间已到；当前歌曲自然播放结束后将自动暂停。"
+      : active
+        ? formatScheduledPlaybackDate(scheduledPlayback.nextAt) +
+          "到达后，当前歌曲播放完毕再暂停"
+        : "选择时间后，到点时会等当前歌曲播放完毕再暂停，播放清单会保留。";
   }
   if (activePanel) activePanel.hidden = !active;
   if (activeTarget && activeCountdown && active) {
-    activeTarget.textContent = formatScheduledPlaybackDate(
-      scheduledPlayback.nextAt,
-    );
-    activeCountdown.textContent = `还有 ${formatScheduledPlaybackCountdown(
-      scheduledPlayback.nextAt,
-    )}`;
+    if (waiting) {
+      activeTarget.textContent = "等待当前歌曲播放结束";
+      activeCountdown.textContent = scheduledPlaybackWaitingTargetAt
+        ? "定时时间 " +
+          formatScheduledPlaybackDate(scheduledPlaybackWaitingTargetAt) +
+          " 已到"
+        : "播放停止后，定时任务结束";
+    } else {
+      activeTarget.textContent = formatScheduledPlaybackDate(
+        scheduledPlayback.nextAt,
+      );
+      activeCountdown.textContent =
+        "还有 " +
+        formatScheduledPlaybackCountdown(scheduledPlayback.nextAt);
+    }
   }
+  syncScheduledPlaybackPresetButtons();
 }
 
 function scheduleScheduledPlaybackWake() {
@@ -7082,9 +8034,23 @@ function checkScheduledPlayback() {
   void triggerScheduledPlayback();
 }
 
+function clearScheduledPlaybackWait() {
+  if (scheduledPlaybackWaitingEndedHandler && ap?.audio) {
+    ap.audio.removeEventListener(
+      "ended",
+      scheduledPlaybackWaitingEndedHandler,
+      true,
+    );
+  }
+  scheduledPlaybackWaitingEndedHandler = null;
+  scheduledPlaybackWaitingForTrackEnd = false;
+  scheduledPlaybackWaitingTargetAt = 0;
+}
+
 function triggerScheduledPlayback() {
   if (!scheduledPlayback || scheduledPlaybackTriggering) return;
   scheduledPlaybackTriggering = true;
+  const scheduledTargetAt = scheduledPlayback.nextAt;
   scheduledPlayback = null;
   persistScheduledPlayback();
   scheduleScheduledPlaybackWake();
@@ -7095,14 +8061,58 @@ function triggerScheduledPlayback() {
       throw new Error("播放器尚未准备好");
     }
     const wasPlaying = !ap.audio.paused && !ap.audio.ended;
-    ap.pause();
-    showToast(
-      wasPlaying ? "定时停止已执行" : "定时停止已触发",
-      wasPlaying ? "播放器已暂停，播放清单会保留。" : "播放器当前已经处于暂停状态。",
-      wasPlaying ? "success" : "info",
-      5000,
-    );
+    if (wasPlaying) {
+      clearScheduledPlaybackWait();
+      scheduledPlaybackWaitingForTrackEnd = true;
+      scheduledPlaybackWaitingTargetAt = scheduledTargetAt;
+      const audio = ap.audio;
+      const handleEnded = (event) => {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        audio.removeEventListener("ended", handleEnded, true);
+        scheduledPlaybackWaitingEndedHandler = null;
+        scheduledPlaybackWaitingForTrackEnd = false;
+        scheduledPlaybackWaitingTargetAt = 0;
+        try {
+          ap.pause();
+        } catch (_) {}
+        currentPlayingId = null;
+        window.currentPlayingId = null;
+        highlightCard(null);
+        syncAllPlayButtons();
+        syncTaskbarPlaybackState();
+        scheduleMediaSessionSync(getCurrentAPlayerAudio(), 180);
+        KaraokeLyrics.hide();
+        updateScheduledPlaybackUI();
+        showToast(
+          "定时停止已执行",
+          "当前歌曲已经播放完毕，播放器已暂停，播放清单会保留。",
+          "success",
+          5000,
+        );
+      };
+      scheduledPlaybackWaitingEndedHandler = handleEnded;
+      audio.addEventListener("ended", handleEnded, {
+        capture: true,
+        once: true,
+      });
+      showToast(
+        "等待当前歌曲结束",
+        "定时时间已到；当前歌曲播放结束后会自动暂停。",
+        "info",
+        5000,
+      );
+    } else {
+      ap.pause();
+      showToast(
+        "定时停止已触发",
+        "播放器当前已经处于暂停状态。",
+        "info",
+        5000,
+      );
+    }
   } catch (error) {
+    clearScheduledPlaybackWait();
     showToast(
       "定时停止失败",
       error?.message || "无法暂停播放器，请手动点击暂停按钮。",
@@ -7132,15 +8142,25 @@ function applyScheduledPlaybackPreset(minutes) {
   const input = document.getElementById("scheduled-playback-time");
   if (!input) return;
   scheduledPlaybackPresetNextAt = target.getTime();
+  scheduledPlaybackEditingPresetMinutes = duration;
   input.value = `${String(target.getHours()).padStart(2, "0")}:${String(
     target.getMinutes(),
   ).padStart(2, "0")}`;
+  document
+    .querySelectorAll("[data-scheduled-playback-minutes]")
+    .forEach((button) => {
+      button.setAttribute(
+        "aria-pressed",
+        String(Number(button.dataset.scheduledPlaybackMinutes) === duration),
+      );
+    });
 }
 
 function openScheduledPlaybackModal() {
   const modal = document.getElementById("scheduledPlaybackModal");
   const timeInput = document.getElementById("scheduled-playback-time");
   scheduledPlaybackPresetNextAt = 0;
+  scheduledPlaybackEditingPresetMinutes = 0;
   if (timeInput) {
     timeInput.value =
       scheduledPlayback?.time || timeInput.value || defaultScheduledPlaybackTime();
@@ -7167,18 +8187,28 @@ function saveScheduledPlayback(event) {
     scheduledPlaybackPresetNextAt > Date.now()
       ? scheduledPlaybackPresetNextAt
       : nextScheduledPlaybackTimestamp(parsed.time);
+  const selectedPreset = Array.from(
+    document.querySelectorAll("[data-scheduled-playback-minutes]"),
+  ).find((button) => button.getAttribute("aria-pressed") === "true");
+  const presetMinutes =
+    scheduledPlaybackPresetNextAt > Date.now() && selectedPreset
+      ? Number(selectedPreset.dataset.scheduledPlaybackMinutes)
+      : 0;
   scheduledPlayback = {
     time: parsed.time,
     nextAt,
+    ...(presetMinutes > 0 ? { presetMinutes } : {}),
   };
   scheduledPlaybackPresetNextAt = 0;
+  scheduledPlaybackEditingPresetMinutes = 0;
   persistScheduledPlayback();
   scheduleScheduledPlaybackWake();
   updateScheduledPlaybackUI();
   closeScheduledPlaybackModal();
   showToast(
     "定时停止已设置",
-    `${formatScheduledPlaybackDate(scheduledPlayback.nextAt)}自动暂停播放。请保持页面运行。`,
+    formatScheduledPlaybackDate(scheduledPlayback.nextAt) +
+      "到达后，当前歌曲播放完毕再暂停。请保持页面运行。",
     "success",
     5000,
   );
@@ -7186,8 +8216,10 @@ function saveScheduledPlayback(event) {
 }
 
 function cancelScheduledPlayback(showFeedback = true) {
+  clearScheduledPlaybackWait();
   scheduledPlayback = null;
   scheduledPlaybackPresetNextAt = 0;
+  scheduledPlaybackEditingPresetMinutes = 0;
   persistScheduledPlayback();
   scheduleScheduledPlaybackWake();
   updateScheduledPlaybackUI();
@@ -7220,10 +8252,14 @@ function initializeScheduledPlayback() {
     });
 
   document
-    .getElementById("scheduled-playback-time")
-    ?.addEventListener("input", () => {
-      scheduledPlaybackPresetNextAt = 0;
-    });
+      .getElementById("scheduled-playback-time")
+      ?.addEventListener("input", () => {
+        scheduledPlaybackPresetNextAt = 0;
+        scheduledPlaybackEditingPresetMinutes = 0;
+        document
+          .querySelectorAll("[data-scheduled-playback-minutes]")
+          .forEach((button) => button.setAttribute("aria-pressed", "false"));
+      });
 
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) checkScheduledPlayback();
@@ -7242,7 +8278,10 @@ function initializeScheduledPlayback() {
 window.musicDlScheduledStop = {
   open: openScheduledPlaybackModal,
   cancel: cancelScheduledPlayback,
-  getState: () => (scheduledPlayback ? { ...scheduledPlayback } : null),
+  getState: () => ({
+    schedule: scheduledPlayback ? { ...scheduledPlayback } : null,
+    waitingForTrackEnd: scheduledPlaybackWaitingForTrackEnd,
+  }),
 };
 
 initializeScheduledPlayback();
@@ -7368,11 +8407,64 @@ function syncPlayerTrackActions(player) {
   }
 }
 
+function ensureAplayerVolumeTooltip(player) {
+  const volumeWrap = player?.querySelector(".aplayer-volume-wrap");
+  const barWrap = volumeWrap?.querySelector(".aplayer-volume-bar-wrap");
+  const bar = barWrap?.querySelector(".aplayer-volume-bar");
+  if (!volumeWrap || !barWrap || !bar) return;
+
+  let tooltip = barWrap.querySelector(".aplayer-volume-tooltip");
+  if (!tooltip) {
+    tooltip = document.createElement("span");
+    tooltip.className = "aplayer-volume-tooltip";
+    tooltip.setAttribute("aria-hidden", "true");
+    tooltip.textContent = Math.round((Number(ap?.audio?.volume) || 0) * 100) + "%";
+    barWrap.appendChild(tooltip);
+  }
+  if (barWrap.dataset.volumeTooltipBound === "1") return;
+  barWrap.dataset.volumeTooltipBound = "1";
+
+  let pointerId = null;
+  const updateTooltip = (event) => {
+    const rect = bar.getBoundingClientRect();
+    if (!rect.height) return;
+    const ratio = Math.min(
+      1,
+      Math.max(0, 1 - (event.clientY - rect.top) / rect.height),
+    );
+    tooltip.textContent = Math.round(ratio * 100) + "%";
+  };
+  const finishVolumeDrag = (event) => {
+    if (pointerId !== null && event.pointerId !== pointerId) return;
+    if (barWrap.hasPointerCapture?.(event.pointerId)) {
+      barWrap.releasePointerCapture(event.pointerId);
+    }
+    pointerId = null;
+    volumeWrap.classList.remove("is-adjusting");
+  };
+
+  barWrap.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    pointerId = event.pointerId;
+    volumeWrap.classList.add("is-adjusting");
+    barWrap.setPointerCapture?.(event.pointerId);
+    updateTooltip(event);
+  });
+  barWrap.addEventListener("pointermove", (event) => {
+    if (pointerId === null || event.pointerId !== pointerId) return;
+    updateTooltip(event);
+  });
+  barWrap.addEventListener("pointerup", finishVolumeDrag);
+  barWrap.addEventListener("pointercancel", finishVolumeDrag);
+  barWrap.addEventListener("lostpointercapture", finishVolumeDrag);
+}
+
 function syncPlayerTrackControls() {
   const player = document.querySelector(".aplayer.aplayer-fixed");
   const hasTracks = Boolean(ap?.list?.audios?.length);
   player?.classList.toggle("is-empty", !hasTracks);
   if (!player) return;
+  ensureAplayerVolumeTooltip(player);
   syncPlayerTrackActions(player);
   syncPlaybackQueueControls(player);
 
@@ -7464,24 +8556,63 @@ syncTaskbarPlaybackState();
 const PLAYER_SPEEDS = Object.freeze([
   0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3,
 ]);
+const PLAYER_SPEED_MARKS = Object.freeze([0.5, 1, 1.5, 2, 2.5, 3]);
 let playerSpeed = (() => {
   const saved = Number(localStorage.getItem("musicdl:playbackRate"));
   return PLAYER_SPEEDS.includes(saved) ? saved : 1;
 })();
 
 window.PLAYER_SPEEDS = PLAYER_SPEEDS;
+window.PLAYER_SPEED_MARKS = PLAYER_SPEED_MARKS;
 window.playerSpeed = playerSpeed;
 window.getPlayerPlaybackRate = () => playerSpeed;
 
+function playerSpeedProgress(rate) {
+  const index = PLAYER_SPEEDS.indexOf(Number(rate));
+  if (index < 0 || PLAYER_SPEEDS.length < 2) return 0;
+  return (index / (PLAYER_SPEEDS.length - 1)) * 100;
+}
+
+function playerSpeedScaleMarkup(className) {
+  const min = PLAYER_SPEEDS[0];
+  const max = PLAYER_SPEEDS[PLAYER_SPEEDS.length - 1];
+  const range = max - min;
+  return (
+    `<div class="${className}" aria-hidden="true">` +
+    PLAYER_SPEED_MARKS.map((rate) => {
+      const position = range > 0 ? ((rate - min) / range) * 100 : 0;
+      return `<span style="--speed-position:${position}%">${rate}x</span>`;
+    }).join("") +
+    "</div>"
+  );
+}
+
+window.playerSpeedScaleMarkup = playerSpeedScaleMarkup;
+
 function applyPlayerPlaybackRate(rate) {
-  if (!ap?.audio) return;
   const normalized = Number(rate) || 1;
-  ap.audio.playbackRate = normalized;
+  if (ap?.audio) {
+    ap.audio.playbackRate = normalized;
+  }
   if (window.VideoGen?.isLocalAudio && window.VideoGen?.localAudio) {
     window.VideoGen.localAudio.playbackRate = normalized;
   }
   const btn = document.querySelector(".player-speed-btn");
   if (btn) btn.textContent = `${normalized}x`;
+  const speedIndex = Math.max(0, PLAYER_SPEEDS.indexOf(normalized));
+  const speedProgress = playerSpeedProgress(normalized);
+  document
+    .querySelectorAll(".player-speed-slider, #vg-speed-slider")
+    .forEach((slider) => {
+      slider.value = String(speedIndex);
+      slider.style.setProperty("--speed-progress", `${speedProgress}%`);
+      slider.setAttribute("aria-valuetext", `${normalized}x`);
+    });
+  document
+    .querySelectorAll(".player-speed-value, #vg-speed-value")
+    .forEach((output) => {
+      output.textContent = `${normalized}x`;
+    });
   document.querySelectorAll(".player-speed-option").forEach((option) => {
     option.classList.toggle(
       "active",
@@ -7498,7 +8629,9 @@ function applyPlayerPlaybackRate(rate) {
       );
     },
   );
-  syncMediaSession();
+  if (ap?.audio) {
+    syncMediaSession();
+  }
 }
 
 function setPlayerPlaybackRate(rate) {
@@ -7545,12 +8678,17 @@ window.applyPlayerPlaybackRate = applyPlayerPlaybackRate;
     const menu = document.createElement("div");
     menu.className = "player-speed-menu";
     menu.hidden = true;
-    menu.innerHTML = PLAYER_SPEEDS.map(
-      (rate) =>
-        `<button type="button" class="player-speed-option${
-          rate === playerSpeed ? " active" : ""
-        }" data-rate="${rate}">${rate}x</button>`,
-    ).join("");
+    menu.innerHTML =
+      '<div class="player-speed-header"><span>播放速度</span>' +
+      '<output class="player-speed-value">' +
+      playerSpeed +
+      'x</output></div>' +
+      '<input class="player-speed-slider" type="range" min="0" max="' +
+      (PLAYER_SPEEDS.length - 1) +
+      '" step="1" value="' +
+      Math.max(0, PLAYER_SPEEDS.indexOf(playerSpeed)) +
+      '" aria-label="播放速度">' +
+      playerSpeedScaleMarkup("player-speed-scale");
 
     button.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -7561,11 +8699,11 @@ window.applyPlayerPlaybackRate = applyPlayerPlaybackRate;
 
     menu.addEventListener("click", (event) => {
       event.stopPropagation();
-      const option = event.target.closest(".player-speed-option");
-      if (!option) return;
-      setPlayerPlaybackRate(Number(option.dataset.rate));
-      menu.hidden = true;
-      button.setAttribute("aria-expanded", "false");
+    });
+    const slider = menu.querySelector(".player-speed-slider");
+    slider?.addEventListener("input", () => {
+      const rate = PLAYER_SPEEDS[Number(slider.value)];
+      if (rate) setPlayerPlaybackRate(rate);
     });
 
     document.addEventListener("click", (event) => {
@@ -7598,9 +8736,11 @@ if (ap?.audio) {
   ap.audio.addEventListener("timeupdate", () => KaraokeLyrics.update());
   ap.audio.addEventListener("seeked", () => KaraokeLyrics.update());
   ap.audio.addEventListener("loadedmetadata", () => {
+    syncCurrentMediaDuration();
     KaraokeLyrics.load(getCurrentAPlayerAudio());
     applyPlayerPlaybackRate(playerSpeed);
   });
+  ap.audio.addEventListener("durationchange", syncCurrentMediaDuration);
   ap.audio.addEventListener("emptied", () => {
     applyPlayerPlaybackRate(playerSpeed);
   });
@@ -8295,7 +9435,7 @@ function playbackEntryFromSong(song) {
   return {
     name:playback.name, artist:playback.artist, album:playback.album || "",
     url:buildStreamURL(playback.id, playback.source, playback.name, playback.artist, playback.album || "", playback.cover || "", playback.extra || ""),
-    cover:song.cover || "", lrc:lyrics.line, raw_lrc:lyrics.auto, theme:"#10b981",
+    cover:song.cover || "", lrc:lyrics.line, raw_lrc:lyrics.auto, theme:webSettings.accentColor,
     custom_id:playback.id, original_id:song.id, original_source:song.source,
     source:playback.source, duration:playback.duration || 0, extra:playback.extra || "",
   };
@@ -8702,7 +9842,7 @@ function getSelectedSongs() {
         cover: song.cover,
         lrc: lyricURLs.line,
         raw_lrc: lyricURLs.auto,
-        theme: "#10b981",
+        theme: webSettings.accentColor,
       });
     }
   });
