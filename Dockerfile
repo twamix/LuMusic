@@ -10,8 +10,9 @@ RUN go mod download
 
 COPY cmd ./cmd
 COPY core ./core
-COPY internal/cli ./internal/cli
-COPY internal/web ./internal/web
+# Copy the whole internal tree so new packages (e.g. internal/safefetch) are
+# never left out of the build stage.
+COPY internal ./internal
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=${TARGETARCH:-$(go env GOARCH)} go build -o music-dl ./cmd/music-dl
 
 # Runtime stage
