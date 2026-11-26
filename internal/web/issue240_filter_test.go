@@ -15,7 +15,9 @@ func TestFilterSongsForDisplayAppliesVersionAndShortTrackFilters(t *testing.T) {
 		{ID: "remix", Name: "Normal Song remix", Duration: 180},
 		{ID: "demo", Name: "正常歌曲（Demo）", Duration: 180},
 		{ID: "preview", Name: "Another Song", Duration: 59},
+		// 上游自 v1.1.8 起把试听判定从“短于 60 秒”改为“60 秒及以下”。
 		{ID: "exact-minute", Name: "One Minute", Duration: 60},
+		{ID: "just-over", Name: "Just Over", Duration: 61},
 		{ID: "unknown-duration", Name: "Unknown Duration", Duration: 0},
 	}
 	settings := core.WebSettings{
@@ -29,11 +31,11 @@ func TestFilterSongsForDisplayAppliesVersionAndShortTrackFilters(t *testing.T) {
 	for _, song := range filtered {
 		got = append(got, song.ID)
 	}
-	want := []string{"normal", "exact-minute", "unknown-duration"}
+	want := []string{"normal", "just-over", "unknown-duration"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("filtered IDs = %#v, want %#v", got, want)
 	}
-	if len(songs) != 7 {
+	if len(songs) != 8 {
 		t.Fatal("filtering must not mutate the input slice")
 	}
 }
