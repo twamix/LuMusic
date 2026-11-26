@@ -6525,7 +6525,6 @@ async function openSystemConfig(initialTab = "general") {
       if (el) el.value = v;
     }
     bindSettingsTabs();
-    setSettingsTab(initialTab);
     setAuthFloatLoggedIn(true);
   } catch (error) {
     if (
